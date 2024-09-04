@@ -256,51 +256,64 @@ impl NFA {
         //         },
         //     },
         // }
-        let mut table: HashMap<usize, HashMap<String, Vec<usize>>> = HashMap::new();
 
-        let mut state_count: usize = 0;
-        let mut map_state_ids = HashMap::new();
+        NFATableBuilder::build_table(&self)
+    }
+}
 
-        let mut get_state_id = |state: &State| -> usize {
-            let ptr = state as *const State;
+struct NFATableBuilder {
+    state_count: usize,
+    table: HashMap<usize, HashMap<String, Vec<usize>>>,
+    map_state_ids: HashMap<*const State, usize>,
+}
 
-            let state_id = map_state_ids.entry(ptr).or_insert_with(|| {
-                state_count += 1;
-                state_count
-            });
-
-            *state_id
+impl NFATableBuilder {
+    fn build_table(nfa: &NFA) -> HashMap<usize, HashMap<String, Vec<usize>>> {
+        let mut builder = NFATableBuilder {
+            state_count: 0,
+            table: HashMap::new(),
+            map_state_ids: HashMap::new(),
         };
 
-        let mut walk_states = vec![self.in_state.to_owned()];
+        builder.walk_state(nfa.in_state.to_owned());
 
-        while walk_states.len() > 0 {
-            let ref_state = walk_states.remove(0);
-            let state = &*ref_state.borrow();
-            let state_id = get_state_id(state);
+        builder.table
+    }
 
-            let mut row: HashMap<String, Vec<usize>> = HashMap::new();
-            row.insert("ε*".to_string(), vec![state_id]);
+    fn walk_state(&mut self, ref_state: Rc<RefCell<State>>) {
+        let state = &*ref_state.borrow();
+        let state_id = self.get_state_id(state);
 
-            for (t, states) in &state.transitions {
-                let transition_label = match t {
-                    'ε' => "ε*".to_string(),
-                    c => c.to_string(),
-                };
+        let mut row: HashMap<String, Vec<usize>> = HashMap::new();
+        row.insert("ε*".to_string(), vec![state_id]);
 
-                let ids = row.entry(transition_label).or_insert(vec![]);
+        for (t, states) in &state.transitions {
+            let transition_label = match t {
+                'ε' => "ε*".to_string(),
+                c => c.to_string(),
+            };
 
-                for child_state in states {
-                    let child_state_id = get_state_id(&child_state.borrow());
-                    ids.push(child_state_id);
-                    walk_states.push(child_state.to_owned());
-                }
+            let ids = row.entry(transition_label).or_insert(vec![]);
+
+            for child_state in states {
+                let child_state_id = self.get_state_id(&child_state.borrow());
+                ids.push(child_state_id);
+                self.walk_state(child_state.to_owned());
             }
-
-            table.insert(state_id, row.to_owned());
         }
 
-        table
+        self.table.insert(state_id, row.to_owned());
+    }
+
+    fn get_state_id(&mut self, state: &State) -> usize {
+        let ptr = state as *const State;
+
+        let state_id = self.map_state_ids.entry(ptr).or_insert_with(|| {
+            self.state_count += 1;
+            self.state_count
+        });
+
+        *state_id
     }
 }
 
@@ -611,7 +624,33 @@ mod tests {
 
         assert_eq!(
             table.get(&2),
-            Some(&HashMap::from([("ε*".to_string(), vec![2, 3])]))
+            Some(&HashMap::from([
+                ("a".to_string(), vec![3]),
+                ("ε*".to_string(), vec![2])
+            ]))
+        );
+
+        assert_eq!(
+            table.get(&3),
+            Some(&HashMap::from([("ε*".to_string(), vec![3, 4]),]))
+        );
+
+        assert_eq!(
+            table.get(&4),
+            Some(&HashMap::from([("ε*".to_string(), vec![4])]))
+        );
+
+        assert_eq!(
+            table.get(&5),
+            Some(&HashMap::from([
+                ("b".to_string(), vec![6]),
+                ("ε*".to_string(), vec![5])
+            ]))
+        );
+
+        assert_eq!(
+            table.get(&6),
+            Some(&HashMap::from([("ε*".to_string(), vec![6, 4])]))
         );
     }
 }
