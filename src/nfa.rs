@@ -6,9 +6,9 @@ use std::{
 
 // TODO: consider removing Rc+RefCell trates
 #[derive(Debug, Clone, PartialEq, Eq)]
-struct State {
-    accepting: bool,
-    transitions: HashMap<char, Vec<Rc<RefCell<State>>>>,
+pub struct State {
+    pub accepting: bool,
+    pub transitions: HashMap<char, Vec<Rc<RefCell<State>>>>,
 }
 
 impl State {
@@ -72,8 +72,8 @@ impl State {
 
 #[derive(Debug, Clone)]
 pub struct NFA {
-    in_state: Rc<RefCell<State>>,
-    out_state: Rc<RefCell<State>>,
+    pub in_state: Rc<RefCell<State>>,
+    pub out_state: Rc<RefCell<State>>,
 }
 
 static EPSILON: char = 'ε';
@@ -140,7 +140,7 @@ impl NFA {
     }
 
     // Creates a union NFA fragment from a single pair of fragments
-    fn or_pair(first: &mut NFA, second: &mut NFA) -> NFA {
+    pub fn or_pair(first: &mut NFA, second: &mut NFA) -> NFA {
         let union = NFA {
             in_state: Rc::new(RefCell::new(State {
                 accepting: false,
@@ -155,8 +155,8 @@ impl NFA {
         first.out_state.borrow_mut().accepting = false;
         second.out_state.borrow_mut().accepting = false;
 
-        // Create a fork from the union incoming state
-        // to the two supported framents.
+        // Create a fork from the union initial state
+        // to the two supported fragments.
         union
             .in_state
             .borrow_mut()
@@ -167,8 +167,8 @@ impl NFA {
             .borrow_mut()
             .add_transition_for_symbol(EPSILON, second.in_state.clone());
 
-        // Merge the frok from the two supported framents
-        // into the union outgoing state.
+        // Merge the fork from the two supported fragments
+        // into the union end state.
         first
             .out_state
             .borrow_mut()
@@ -183,7 +183,7 @@ impl NFA {
     }
 
     // Creates a union NFA fragment from multiple fragments
-    fn or(nfas: Vec<NFA>) -> NFA {
+    pub fn or(nfas: Vec<NFA>) -> NFA {
         if nfas.len() < 2 {
             panic!("or requires at least 2 NFAs to work");
         }
@@ -200,120 +200,12 @@ impl NFA {
     }
 
     // Creates a repetition NFA frament (aka Kleene closure).
-    fn rep(fragment: NFA) -> NFA {
+    pub fn rep(fragment: NFA) -> NFA {
         todo!()
     }
 
-    fn get_transition_table(&self) -> HashMap<usize, HashMap<String, Vec<usize>>> {
-        // Epsilon closure (denotaed as "ε*"): set of states reacheable from this state,
-        // following only ε-transitions. Which means, it containes the state it self and
-        // the states is moving to.
-        // {
-        //   '1': { a: [ 2 ], 'ε*': [ 1 ] },
-        //   '2': { 'ε*': [ 2, 3 ] },
-        //   '3': { b: [ 4 ], 'ε*': [ 3 ] },
-        //   '4': { 'ε*': [ 4 ] },
-        // }
-        //
-        //  {
-        //     in_state: RefCell {
-        //         value: State {
-        //             accepting: false,
-        //             transitions: {
-        //                 'a': [
-        //                     RefCell {
-        //                         value: State {
-        //                             accepting: false,
-        //                             transitions: {
-        //                                 'ε': [
-        //                                     RefCell {
-        //                                         value: State {
-        //                                             accepting: false,
-        //                                             transitions: {
-        //                                                 'b': [
-        //                                                     RefCell {
-        //                                                         value: State {
-        //                                                             accepting: true,
-        //                                                             transitions: {},
-        //                                                         },
-        //                                                     },
-        //                                                 ],
-        //                                             },
-        //                                         },
-        //                                     },
-        //                                 ],
-        //                             },
-        //                         },
-        //                     },
-        //                 ],
-        //             },
-        //         },
-        //     },
-        //     out_state: RefCell {
-        //         value: State {
-        //             accepting: true,
-        //             transitions: {},
-        //         },
-        //     },
-        // }
-
-        NFATableBuilder::build_table(&self)
-    }
-}
-
-struct NFATableBuilder {
-    state_count: usize,
-    table: HashMap<usize, HashMap<String, Vec<usize>>>,
-    map_state_ids: HashMap<*const State, usize>,
-}
-
-impl NFATableBuilder {
-    fn build_table(nfa: &NFA) -> HashMap<usize, HashMap<String, Vec<usize>>> {
-        let mut builder = NFATableBuilder {
-            state_count: 0,
-            table: HashMap::new(),
-            map_state_ids: HashMap::new(),
-        };
-
-        builder.walk_state(nfa.in_state.to_owned());
-
-        builder.table
-    }
-
-    fn walk_state(&mut self, ref_state: Rc<RefCell<State>>) {
-        let state = &*ref_state.borrow();
-        let state_id = self.get_state_id(state);
-
-        let mut row: HashMap<String, Vec<usize>> = HashMap::new();
-        row.insert("ε*".to_string(), vec![state_id]);
-
-        for (t, states) in &state.transitions {
-            let transition_label = match t {
-                'ε' => "ε*".to_string(),
-                c => c.to_string(),
-            };
-
-            let ids = row.entry(transition_label).or_insert(vec![]);
-
-            for child_state in states {
-                let child_state_id = self.get_state_id(&child_state.borrow());
-                ids.push(child_state_id);
-                self.walk_state(child_state.to_owned());
-            }
-        }
-
-        self.table.insert(state_id, row.to_owned());
-    }
-
-    fn get_state_id(&mut self, state: &State) -> usize {
-        let ptr = state as *const State;
-
-        let state_id = self.map_state_ids.entry(ptr).or_insert_with(|| {
-            self.state_count += 1;
-            self.state_count
-        });
-
-        *state_id
+    pub fn get_transition_table(&self) -> HashMap<usize, HashMap<String, Vec<usize>>> {
+        crate::nfa_table::NFATableBuilder::build_table(&self)
     }
 }
 
@@ -403,7 +295,7 @@ mod tests {
 
     #[test]
     fn or_pair() {
-        // The expecetd NFA output from this orenation should be:
+        // The expecetd NFA output from this union should be:
         //
         //             -> ε -> a -> ε -
         //           /                  \
@@ -463,194 +355,5 @@ mod tests {
         // // c -> <end>
         // let transitions = &state.borrow().transitions;
         // assert_eq!(transitions.len(), 0);
-    }
-
-    #[test]
-    fn get_transition_table_concat() {
-        // Given regex /ab/
-        // Its graph looks like:
-        //                    a          ε          b
-        //  (s:1 - starting) ---> (s:2) ---> (s:3) ---> (s:4 - accepting)
-        //
-        // Its NFA table is:
-        //
-        // ┌─────┬───┬───┬───────┐
-        // │     │ a │ b │ ε*    │
-        // ├─────┼───┼───┼───────┤
-        // │ 1 > │ 2 │   │ 1     │
-        // ├─────┼───┼───┼───────┤
-        // │ 2   │   │   │ {2,3} │
-        // ├─────┼───┼───┼───────┤
-        // │ 3   │   │ 4 │ 3     │
-        // ├─────┼───┼───┼───────┤
-        // │ 4 ✓ │   │   │ 4     │
-        // └─────┴───┴───┴───────┘
-        //
-        // And the data representation as JSON is:
-        //
-        // {
-        //   '1': { a: [ 2 ], 'ε*': [ 1 ] },
-        //   '2': { 'ε*': [ 2, 3 ] },
-        //   '3': { b: [ 4 ], 'ε*': [ 3 ] },
-        //   '4': { 'ε*': [ 4 ] },
-        // }
-        //  {
-        //     in_state: RefCell {                                                          -> state:1 - starting
-        //         value: State {
-        //             accepting: false,
-        //             transitions: {
-        //                 'a': [                                                           -> transition:a
-        //                     RefCell {
-        //                         value: State {                                           -> state:2
-        //                             accepting: false,
-        //                             transitions: {
-        //                                 'ε': [                                           -> transition:ε
-        //                                     RefCell {
-        //                                         value: State {                           -> state:3
-        //                                             accepting: false,
-        //                                             transitions: {
-        //                                                 'b': [                           -> transition:b
-        //                                                     RefCell {
-        //                                                         value: State {           -> state:4 - accepting
-        //                                                             accepting: true,
-        //                                                             transitions: {},
-        //                                                         },
-        //                                                     },
-        //                                                 ],
-        //                                             },
-        //                                         },
-        //                                     },
-        //                                 ],
-        //                             },
-        //                         },
-        //                     },
-        //                 ],
-        //             },
-        //         },
-        //     },
-        //     out_state: RefCell {
-        //         value: State {
-        //             accepting: true,
-        //             transitions: {},
-        //         },
-        //     },
-        // }
-
-        let re = NFA::concat(vec![NFA::char('a'), NFA::char('b')]);
-        println!("test get_transition_table re {:#?}", re);
-
-        let table = re.get_transition_table();
-        println!("test get_transition_table table {:#?}", table);
-        assert_eq!(table.len(), 4);
-
-        assert_eq!(
-            table.get(&1),
-            Some(&HashMap::from([
-                ("ε*".to_string(), vec![1]),
-                ("a".to_string(), vec![2]),
-            ]))
-        );
-
-        assert_eq!(
-            table.get(&2),
-            Some(&HashMap::from([("ε*".to_string(), vec![2, 3])]))
-        );
-
-        assert_eq!(
-            table.get(&3),
-            Some(&HashMap::from([
-                ("ε*".to_string(), vec![3]),
-                ("b".to_string(), vec![4]),
-            ]))
-        );
-
-        assert_eq!(
-            table.get(&4),
-            Some(&HashMap::from([("ε*".to_string(), vec![4])]))
-        );
-    }
-
-    #[test]
-    fn get_transition_table_or() {
-        // Given regex /a|b/
-        // Its graph looks like:
-        //                  ε          a          ε
-        //                 ---> (s:2) ---> (s:3) ---
-        //                /                          \
-        //  <start> -(s:1)                            - (s:4) -> <end>
-        //                \                          /
-        //                 ---> (s:5) ---> (s:6) ---
-        //                  ε          a          ε
-        //
-        // Its NFA table is:
-        //
-        // ┌─────┬───┬───┬─────────┐
-        // │     │ a │ b │ ε*      │
-        // ├─────┼───┼───┼─────────┤
-        // │ 1 > │   │   │ {1,2,5} │
-        // ├─────┼───┼───┼─────────┤
-        // │ 2   │ 3 │   │ 2       │
-        // ├─────┼───┼───┼─────────┤
-        // │ 3   │   │   │ {3,4}   │
-        // ├─────┼───┼───┼─────────┤
-        // │ 4 ✓ │   │   │ 4       │
-        // ├─────┼───┼───┼─────────┤
-        // │ 5   │   │ 6 │ 5       │
-        // ├─────┼───┼───┼─────────┤
-        // │ 6   │   │   │ {6,4}   │
-        // └─────┴───┴───┴─────────┘
-        //
-        // And the data representation as JSON is:
-        //
-        // {
-        //   '1': { 'ε*': [ 1, 2, 5 ] },
-        //   '2': { a: [ 3 ], 'ε*': [ 2 ] },
-        //   '3': { 'ε*': [ 3, 4 ] },
-        //   '4': { 'ε*': [ 4 ] },
-        //   '5': { b: [ 6 ], 'ε*': [ 5 ] },
-        //   '6': { 'ε*': [ 6, 4 ] },
-        // }
-        let re = NFA::or(vec![NFA::char('a'), NFA::char('b')]);
-        println!("test get_transition_table re {:#?}", re);
-
-        let table = re.get_transition_table();
-        println!("test get_transition_table table {:#?}", table);
-        assert_eq!(table.len(), 6);
-
-        assert_eq!(
-            table.get(&1),
-            Some(&HashMap::from([("ε*".to_string(), vec![1, 2, 5]),]))
-        );
-
-        assert_eq!(
-            table.get(&2),
-            Some(&HashMap::from([
-                ("a".to_string(), vec![3]),
-                ("ε*".to_string(), vec![2])
-            ]))
-        );
-
-        assert_eq!(
-            table.get(&3),
-            Some(&HashMap::from([("ε*".to_string(), vec![3, 4]),]))
-        );
-
-        assert_eq!(
-            table.get(&4),
-            Some(&HashMap::from([("ε*".to_string(), vec![4])]))
-        );
-
-        assert_eq!(
-            table.get(&5),
-            Some(&HashMap::from([
-                ("b".to_string(), vec![6]),
-                ("ε*".to_string(), vec![5])
-            ]))
-        );
-
-        assert_eq!(
-            table.get(&6),
-            Some(&HashMap::from([("ε*".to_string(), vec![6, 4])]))
-        );
     }
 }

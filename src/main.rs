@@ -1,4 +1,6 @@
 mod nfa;
+mod nfa_table;
+
 use nfa::NFA;
 
 fn main() {
