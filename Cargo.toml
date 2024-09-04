@@ -1,0 +1,4 @@
+[package]
+name = "rust-automata-regexp-machine"
+version = "0.1.0"
+edition = "2021"
