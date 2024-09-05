@@ -1,4 +1,8 @@
-use std::{cell::RefCell, collections::HashMap, rc::Rc};
+use std::{
+    cell::RefCell,
+    collections::{HashMap, HashSet},
+    rc::Rc,
+};
 
 use crate::nfa::{State, NFA};
 
@@ -6,6 +10,7 @@ pub struct NFATableBuilder {
     state_count: usize,
     table: HashMap<usize, HashMap<String, Vec<usize>>>,
     map_state_ids: HashMap<*const State, usize>,
+    visited: HashSet<*const State>,
 }
 
 impl NFATableBuilder {
@@ -25,6 +30,7 @@ impl NFATableBuilder {
             state_count: 0,
             table: HashMap::new(),
             map_state_ids: HashMap::new(),
+            visited: HashSet::new(),
         };
 
         builder.walk_state(nfa.in_state.to_owned());
@@ -35,6 +41,17 @@ impl NFATableBuilder {
     fn walk_state(&mut self, ref_state: Rc<RefCell<State>>) {
         let state = &*ref_state.borrow();
         let state_id = self.get_state_id(state);
+
+        let ptr = state as *const State;
+        println!(
+            "state ptr {:?} is visited? {:?}",
+            ptr,
+            self.visited.contains(&ptr)
+        );
+        if self.visited.contains(&ptr) {
+            return;
+        }
+        self.visited.insert(ptr.to_owned());
 
         let mut row: HashMap<String, Vec<usize>> = HashMap::new();
         row.insert("ε*".to_string(), vec![state_id]);
@@ -259,6 +276,68 @@ mod tests {
         assert_eq!(
             table.get(&6),
             Some(&HashMap::from([("ε*".to_string(), vec![6, 4])]))
+        );
+    }
+
+    #[test]
+    fn get_transition_table_rep() {
+        // Given regex /a*/
+        //
+        // The original zero or more NFA graph would look like this:
+        //                        .------------------.
+        //                       \/                  |
+        //                 ε          a          ε
+        //  <start> (s:1) ---> (s:2) ---> (s:3) ---> (s:4) <end>
+        //                                           /\
+        //                |                          |
+        //                .-------------------------.
+        //                             ε
+        //
+        // But we are using an optimized implementation,
+        // so the graph looks like this instead:
+        //
+        //            .-----------.
+        //           \/           |
+        //                 a
+        //  <start> (s:1) --->  (s:4) <end>
+        //                       /\
+        //           |           |
+        //           .-----------.
+        //                 ε
+        //
+        // Its NFA table is:
+        //
+        // ┌─────┬───┬───────┐
+        // │     │ a │ ε*    │
+        // ├─────┼───┼───────┤
+        // │ 1 > │ 2 │ {1,2} │
+        // ├─────┼───┼───────┤
+        // │ 2 ✓ │   │ {2,1} │
+        // └─────┴───┴───────┘
+        //
+        // And the data representation as JSON is:
+        //
+        // {
+        //   '1': { a: [ 2 ], 'ε*': [ 1,2 ] },
+        //   '2': { 'ε*': [ 2, 1 ] },
+        // }
+        let re = NFA::rep(NFA::char('a'));
+
+        let table = re.get_transition_table();
+        println!("test get_transition_table table {:#?}", table);
+        assert_eq!(table.len(), 2);
+
+        assert_eq!(
+            table.get(&1),
+            Some(&HashMap::from([
+                ("a".to_string(), vec![2]),
+                ("ε*".to_string(), vec![1, 2])
+            ]))
+        );
+
+        assert_eq!(
+            table.get(&2),
+            Some(&HashMap::from([("ε*".to_string(), vec![2, 1]),]))
         );
     }
 }

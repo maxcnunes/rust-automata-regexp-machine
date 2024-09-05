@@ -201,37 +201,22 @@ impl NFA {
 
     // Creates a repetition NFA frament (aka Kleene closure).
     pub fn rep(fragment: NFA) -> NFA {
-        let repetition = NFA {
-            in_state: Rc::new(RefCell::new(State {
-                accepting: false,
-                transitions: HashMap::new(),
-            })),
-            out_state: Rc::new(RefCell::new(State {
-                accepting: true,
-                transitions: HashMap::new(),
-            })),
-        };
-
-        fragment.out_state.borrow_mut().accepting = false;
-
         // Add the skip transition, repeating the machine 0 time.
-        repetition
+        fragment
             .in_state
             .borrow_mut()
-            .add_transition_for_symbol(EPSILON, repetition.out_state.clone());
+            .add_transition_for_symbol(EPSILON, fragment.out_state.clone());
 
         // Add the actual fragment repetition, repeating the machine 1 or more times.
-        repetition
-            .in_state
-            .borrow_mut()
-            .add_transition_for_symbol(EPSILON, fragment.in_state.clone());
-
         fragment
             .out_state
             .borrow_mut()
-            .add_transition_for_symbol(EPSILON, repetition.out_state.clone());
+            .add_transition_for_symbol(EPSILON, fragment.in_state.clone());
 
-        repetition
+        NFA {
+            in_state: fragment.in_state.to_owned(),
+            out_state: fragment.out_state.to_owned(),
+        }
     }
 
     pub fn get_transition_table(&self) -> HashMap<usize, HashMap<String, Vec<usize>>> {
