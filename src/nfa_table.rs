@@ -4,7 +4,8 @@ use std::{
     rc::Rc,
 };
 
-use crate::nfa::{State, NFA};
+use crate::nfa::NFA;
+use crate::state::State;
 
 pub struct NFATableBuilder {
     state_count: usize,
@@ -43,11 +44,6 @@ impl NFATableBuilder {
         let state_id = self.get_state_id(state);
 
         let ptr = state as *const State;
-        println!(
-            "state ptr {:?} is visited? {:?}",
-            ptr,
-            self.visited.contains(&ptr)
-        );
         if self.visited.contains(&ptr) {
             return;
         }
