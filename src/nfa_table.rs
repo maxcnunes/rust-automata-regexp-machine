@@ -7,15 +7,19 @@ use std::{
 use crate::nfa::NFA;
 use crate::state::State;
 
-pub struct NFATableBuilder {
+#[derive(Debug)]
+pub struct NFATable {
     state_count: usize,
-    table: HashMap<usize, HashMap<String, Vec<usize>>>,
     map_state_ids: HashMap<*const State, usize>,
     visited: HashSet<*const State>,
+
+    pub starting_state: usize,
+    pub accepting_states: HashSet<usize>,
+    pub table: HashMap<usize, HashMap<String, Vec<usize>>>,
 }
 
-impl NFATableBuilder {
-    pub fn build_table(nfa: &NFA) -> HashMap<usize, HashMap<String, Vec<usize>>> {
+impl NFATable {
+    pub fn from(nfa: &NFA) -> Self {
         // Epsilon closure (denotaed as "ε*"): set of states reacheable from this state,
         // following only ε-transitions. Which means, it contains the state of it self and
         // the states it is transition to.
@@ -27,21 +31,32 @@ impl NFATableBuilder {
         //   '3': { b: [ 4 ], 'ε*': [ 3 ] },
         //   '4': { 'ε*': [ 4 ] },
         // }
-        let mut builder = NFATableBuilder {
+        let mut builder = NFATable {
             state_count: 0,
-            table: HashMap::new(),
             map_state_ids: HashMap::new(),
+            starting_state: 0,
+            accepting_states: HashSet::new(),
             visited: HashSet::new(),
+            table: HashMap::new(),
         };
 
         builder.walk_state(nfa.in_state.to_owned());
 
-        builder.table
+        builder
     }
 
     fn walk_state(&mut self, ref_state: Rc<RefCell<State>>) {
         let state = &*ref_state.borrow();
         let state_id = self.get_state_id(state);
+        // println!(
+        //     "walk_state state_id={} table_len={}",
+        //     state_id,
+        //     self.table.len()
+        // );
+
+        if self.starting_state == 0 {
+            self.starting_state = state_id;
+        }
 
         let ptr = state as *const State;
         if self.visited.contains(&ptr) {
@@ -65,6 +80,10 @@ impl NFATableBuilder {
                 ids.push(child_state_id);
                 self.walk_state(child_state.to_owned());
             }
+        }
+
+        if state.accepting {
+            self.accepting_states.insert(state_id);
         }
 
         self.table.insert(state_id, row.to_owned());
@@ -160,12 +179,17 @@ mod tests {
         let re = NFA::concat(vec![NFA::char('a'), NFA::char('b')]);
         println!("test get_transition_table re {:#?}", re);
 
-        let table = re.get_transition_table();
-        println!("test get_transition_table table {:#?}", table);
-        assert_eq!(table.len(), 4);
+        let nfa_table = re.get_transition_table();
+        println!("test get_transition_table table {:#?}", nfa_table);
+        assert_eq!(nfa_table.starting_state, 1);
+
+        assert_eq!(nfa_table.accepting_states.len(), 1);
+        assert_eq!(nfa_table.accepting_states, HashSet::from([4]));
+
+        assert_eq!(nfa_table.table.len(), 4);
 
         assert_eq!(
-            table.get(&1),
+            nfa_table.table.get(&1),
             Some(&HashMap::from([
                 ("ε*".to_string(), vec![1]),
                 ("a".to_string(), vec![2]),
@@ -173,12 +197,12 @@ mod tests {
         );
 
         assert_eq!(
-            table.get(&2),
+            nfa_table.table.get(&2),
             Some(&HashMap::from([("ε*".to_string(), vec![2, 3])]))
         );
 
         assert_eq!(
-            table.get(&3),
+            nfa_table.table.get(&3),
             Some(&HashMap::from([
                 ("ε*".to_string(), vec![3]),
                 ("b".to_string(), vec![4]),
@@ -186,7 +210,7 @@ mod tests {
         );
 
         assert_eq!(
-            table.get(&4),
+            nfa_table.table.get(&4),
             Some(&HashMap::from([("ε*".to_string(), vec![4])]))
         );
     }
@@ -234,17 +258,22 @@ mod tests {
         let re = NFA::or(vec![NFA::char('a'), NFA::char('b')]);
         println!("test get_transition_table re {:#?}", re);
 
-        let table = re.get_transition_table();
-        println!("test get_transition_table table {:#?}", table);
-        assert_eq!(table.len(), 6);
+        let nfa_table = re.get_transition_table();
+        println!("test get_transition_table table {:#?}", nfa_table);
+        assert_eq!(nfa_table.starting_state, 1);
+
+        assert_eq!(nfa_table.accepting_states.len(), 1);
+        assert_eq!(nfa_table.accepting_states, HashSet::from([4]));
+
+        assert_eq!(nfa_table.table.len(), 6);
 
         assert_eq!(
-            table.get(&1),
+            nfa_table.table.get(&1),
             Some(&HashMap::from([("ε*".to_string(), vec![1, 2, 5]),]))
         );
 
         assert_eq!(
-            table.get(&2),
+            nfa_table.table.get(&2),
             Some(&HashMap::from([
                 ("a".to_string(), vec![3]),
                 ("ε*".to_string(), vec![2])
@@ -252,17 +281,17 @@ mod tests {
         );
 
         assert_eq!(
-            table.get(&3),
+            nfa_table.table.get(&3),
             Some(&HashMap::from([("ε*".to_string(), vec![3, 4]),]))
         );
 
         assert_eq!(
-            table.get(&4),
+            nfa_table.table.get(&4),
             Some(&HashMap::from([("ε*".to_string(), vec![4])]))
         );
 
         assert_eq!(
-            table.get(&5),
+            nfa_table.table.get(&5),
             Some(&HashMap::from([
                 ("b".to_string(), vec![6]),
                 ("ε*".to_string(), vec![5])
@@ -270,7 +299,7 @@ mod tests {
         );
 
         assert_eq!(
-            table.get(&6),
+            nfa_table.table.get(&6),
             Some(&HashMap::from([("ε*".to_string(), vec![6, 4])]))
         );
     }
@@ -319,12 +348,17 @@ mod tests {
         // }
         let re = NFA::rep(NFA::char('a'));
 
-        let table = re.get_transition_table();
-        println!("test get_transition_table table {:#?}", table);
-        assert_eq!(table.len(), 2);
+        let nfa_table = re.get_transition_table();
+        println!("test get_transition_table table {:#?}", nfa_table);
+        assert_eq!(nfa_table.starting_state, 1);
+
+        assert_eq!(nfa_table.accepting_states.len(), 1);
+        assert_eq!(nfa_table.accepting_states, HashSet::from([2]));
+
+        assert_eq!(nfa_table.table.len(), 2);
 
         assert_eq!(
-            table.get(&1),
+            nfa_table.table.get(&1),
             Some(&HashMap::from([
                 ("a".to_string(), vec![2]),
                 ("ε*".to_string(), vec![1, 2])
@@ -332,7 +366,7 @@ mod tests {
         );
 
         assert_eq!(
-            table.get(&2),
+            nfa_table.table.get(&2),
             Some(&HashMap::from([("ε*".to_string(), vec![2, 1]),]))
         );
     }

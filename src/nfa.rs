@@ -4,7 +4,10 @@ use std::{
     rc::Rc,
 };
 
-use crate::state::{State, EPSILON};
+use crate::{
+    nfa_table::NFATable,
+    state::{State, EPSILON},
+};
 
 #[derive(Debug, Clone)]
 pub struct NFA {
@@ -153,8 +156,8 @@ impl NFA {
         }
     }
 
-    pub fn get_transition_table(&self) -> HashMap<usize, HashMap<String, Vec<usize>>> {
-        crate::nfa_table::NFATableBuilder::build_table(&self)
+    pub fn get_transition_table(&self) -> NFATable {
+        NFATable::from(&self)
     }
 }
 
