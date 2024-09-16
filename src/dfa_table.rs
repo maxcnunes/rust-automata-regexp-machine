@@ -19,6 +19,49 @@ pub struct DFATable {
 }
 
 impl DFATable {
+    pub fn simplify_notations(&mut self) {
+        let mut count = 0_usize;
+        let mut hash: HashMap<String, String> = HashMap::new();
+        let mut new_table = HashMap::with_capacity(self.table.len());
+        let mut new_accepting_states = HashSet::with_capacity(self.accepting_states.len());
+
+        for (root_states_id, transitions) in self.table.iter() {
+            let new_root_states_id = hash
+                .entry(root_states_id.to_string())
+                .or_insert_with(|| {
+                    count += 1;
+                    count.to_string()
+                })
+                .to_owned();
+
+            let mut new_transitions: HashMap<String, String> =
+                HashMap::with_capacity(transitions.len());
+
+            for (transition, transition_states_id) in transitions.iter() {
+                let new_transition_states_id = hash
+                    .entry(transition_states_id.to_string())
+                    .or_insert_with(|| {
+                        count += 1;
+                        count.to_string()
+                    })
+                    .to_owned();
+
+                new_transitions.insert(transition.to_owned(), new_transition_states_id);
+            }
+
+            new_table.insert(new_root_states_id, new_transitions);
+        }
+
+        for id in self.accepting_states.iter() {
+            let new_id = hash.get(id).unwrap().to_owned();
+            new_accepting_states.insert(new_id);
+        }
+
+        self.table = new_table;
+        self.accepting_states = new_accepting_states;
+        self.starting_state = hash.get(&self.starting_state).unwrap().to_owned();
+    }
+
     pub fn from(nfa: &NFA) -> Self {
         // Epsilon closure (denotaed as "ε*"): set of states reacheable from this state,
         // following only ε-transitions. Which means, it contains the state of it self and
@@ -281,12 +324,12 @@ mod tests {
         // And the data representation as JSON is:
         //
         // {
-        //   "1,2,5": { "a": "3,4", "ε*": "6,4" },
+        //   "1,2,5": { "a": "3,4", "b": "6,4" },
         //   "3,4": {},
         //   "6,4": {},
         // }
         let nfa = NFA::or(vec![NFA::char('a'), NFA::char('b')]);
-        let dfa_table = DFATable::from(&nfa);
+        let mut dfa_table = DFATable::from(&nfa);
         println!("test get_transition_table table {:#?}", dfa_table);
 
         assert_eq!(dfa_table.starting_state, "1,2,5".to_string());
@@ -316,6 +359,60 @@ mod tests {
             dfa_table.table.get(&"6,4".to_string()),
             Some(&HashMap::new())
         );
+
+        // In this second testing phase we apply the remapping to simplify the state notations.
+        // The graph will look like this:
+        //                  a
+        //                 ---> (s:2)
+        //                /
+        //  <start> -(s:1)
+        //                \
+        //                 ---> (s:3)
+        //                  b
+        //
+        // It should have the previous table remapped to this:
+        //
+        // ┌─────┬───┬───┐
+        // │     │ a │ b │
+        // ├─────┼───┼───┤
+        // │ 1 > │ 3 │ 2 │
+        // ├─────┼───┼───┤
+        // │ 2 ✓ │   │   │
+        // ├─────┼───┼───┤
+        // │ 3 ✓ │   │   │
+        // └─────┴───┴───┘
+        //
+        // And the data representation as JSON is:
+        //
+        // {
+        //   "1": { "a": "2", "b": "3" },
+        //   "2": {},
+        //   "3": {},
+        // }
+        dfa_table.simplify_notations();
+        println!("test get_transition_table remapped table {:#?}", dfa_table);
+
+        assert_eq!(dfa_table.starting_state, "1".to_string());
+
+        assert_eq!(dfa_table.accepting_states.len(), 2);
+        assert_eq!(
+            dfa_table.accepting_states,
+            HashSet::from(["2".to_string(), "3".to_string()])
+        );
+
+        assert_eq!(dfa_table.table.len(), 3);
+
+        assert_eq!(
+            dfa_table.table.get(&"1".to_string()),
+            Some(&HashMap::from([
+                ("b".to_string(), "3".to_string()),
+                ("a".to_string(), "2".to_string()),
+            ]))
+        );
+
+        assert_eq!(dfa_table.table.get(&"2".to_string()), Some(&HashMap::new()));
+
+        assert_eq!(dfa_table.table.get(&"3".to_string()), Some(&HashMap::new()));
     }
 
     // #[test]
