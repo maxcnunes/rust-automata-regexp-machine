@@ -1,6 +1,6 @@
 use std::{
     cell::RefCell,
-    collections::{BTreeMap, HashSet},
+    collections::{BTreeMap, HashMap, HashSet},
     rc::Rc,
 };
 
@@ -70,6 +70,48 @@ impl DFATable {
         self.table = new_table;
         self.accepting_states = new_accepting_states;
         self.starting_state = hash.get(&self.starting_state).unwrap().to_owned();
+    }
+
+    pub fn apply_minimization(&mut self, groups: &Vec<Vec<String>>) {
+        let mut new_table = BTreeMap::new();
+        let mut new_accepting_states = HashSet::new();
+        let mut new_labels = HashMap::new();
+
+        for group_states in groups {
+            for old_label in group_states {
+                let new_label: String = group_states
+                    .iter()
+                    .map(|n| n.to_string())
+                    .collect::<Vec<String>>()
+                    .join(",");
+
+                new_labels.insert(old_label, new_label);
+            }
+        }
+
+        for (root_states_id, transitions) in self.table.iter() {
+            let new_root_states_id = new_labels.get(root_states_id).unwrap().to_owned();
+
+            let mut new_transitions: BTreeMap<String, String> = BTreeMap::new();
+
+            for (transition, transition_states_id) in transitions.iter() {
+                let new_transition_states_id =
+                    new_labels.get(&transition_states_id).unwrap().to_owned();
+
+                new_transitions.insert(transition.to_owned(), new_transition_states_id);
+            }
+
+            new_table.insert(new_root_states_id, new_transitions);
+        }
+
+        for id in self.accepting_states.iter() {
+            let new_id = new_labels.get(id).unwrap().to_owned();
+            new_accepting_states.insert(new_id);
+        }
+
+        self.table = new_table;
+        self.accepting_states = new_accepting_states;
+        self.starting_state = new_labels.get(&self.starting_state).unwrap().to_owned();
     }
 
     pub fn from(nfa: &NFA) -> Self {

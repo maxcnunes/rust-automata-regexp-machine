@@ -37,12 +37,31 @@ impl DFA {
         self.table.table.to_owned()
     }
 
+    pub fn simplify_notations(&mut self) {
+        self.table.simplify_notations();
+    }
+
     // Minimize this DFA.
     // To check whether they are equivalent we should see where we go from each character from these states,
     // if we go to the states which belong to the same group, the original states are equivalent.
     // Even if the actual states are different, the important is whether the outgoing state belongs to the same group.
-    pub fn minimize(&mut self) {
-        todo!()
+    pub fn minimize(&mut self) -> bool {
+        let mut groups = vec![];
+        let mut minimizing = true;
+        let mut minimized = false;
+
+        while minimizing {
+            minimizing = self.minimize_once(&mut groups);
+            if minimizing {
+                minimized = true;
+            }
+        }
+
+        if minimized {
+            self.table.apply_minimization(&groups);
+        }
+
+        minimized
     }
 
     fn minimize_once(&mut self, groups: &mut Vec<Vec<String>>) -> bool {
@@ -355,7 +374,7 @@ mod tests {
     // }
 
     #[test]
-    fn minimize_table() {
+    fn minimize_once_table() {
         // Given a DFA graph like this:
         //
         //                           a           a
@@ -490,9 +509,163 @@ mod tests {
         assert_eq!(groups.len(), 4);
 
         assert_eq!(groups[0], ["1".to_string(), "3".to_string()]);
-
         assert_eq!(groups[1], ["5".to_string()]);
         assert_eq!(groups[2], ["4".to_string()]);
         assert_eq!(groups[3], ["2".to_string()]);
+    }
+
+    #[test]
+    fn minimize_table() {
+        // Given a DFA graph like this:
+        //
+        //                           a           a
+        //                          ___     __________
+        //                         |   \   /         |
+        //                         \   |  |          |
+        //                    a     \ \/ \/   b      |
+        //                 ------> ( s:2 ) -----> ( s:4 )
+        //                /         /\ /\            |
+        //               /          |  |    a        |
+        //  <start> -(s:1)        a |  |________     | b
+        //               \          |           \    |
+        //                \         |            \  \/
+        //                 ------> ( s:3 ) <---- ( s:5 ) -> <end>
+        //                    b    /  /\     b
+        //                        |   |
+        //                        \__/
+        //                          b
+        //
+        // Its DFA table is:
+        //
+        // ┌─────┬───┬───┐
+        // │     │ a │ b │
+        // ├─────┼───┼───┤
+        // │ 1 > │ 2 │ 3 │
+        // ├─────┼───┼───┤
+        // │ 2   │ 2 │ 4 │
+        // ├─────┼───┼───┤
+        // │ 3   │ 2 │ 3 │
+        // ├─────┼───┼───┤
+        // │ 4   │ 2 │ 5 │
+        // ├─────┼───┼───┤
+        // │ 5 ✓ │ 2 │ 3 │
+        // └─────┴───┴───┘
+        //
+        let mut dfa_table = DFATable::new();
+        dfa_table.starting_state = "1".to_string();
+        dfa_table.accepting_states = HashSet::from([("5".to_string())]);
+        dfa_table.table = BTreeMap::from([
+            (
+                "1".to_string(),
+                BTreeMap::from([
+                    ("a".to_string(), "2".to_string()),
+                    ("b".to_string(), "3".to_string()),
+                ]),
+            ),
+            (
+                "2".to_string(),
+                BTreeMap::from([
+                    ("a".to_string(), "2".to_string()),
+                    ("b".to_string(), "4".to_string()),
+                ]),
+            ),
+            (
+                "3".to_string(),
+                BTreeMap::from([
+                    ("a".to_string(), "2".to_string()),
+                    ("b".to_string(), "3".to_string()),
+                ]),
+            ),
+            (
+                "4".to_string(),
+                BTreeMap::from([
+                    ("a".to_string(), "2".to_string()),
+                    ("b".to_string(), "5".to_string()),
+                ]),
+            ),
+            (
+                "5".to_string(),
+                BTreeMap::from([
+                    ("a".to_string(), "2".to_string()),
+                    ("b".to_string(), "3".to_string()),
+                ]),
+            ),
+        ]);
+        println!("test minimize_table table {:#?}", dfa_table);
+
+        let mut dfa = DFA {
+            table: dfa_table.to_owned(),
+        };
+
+        let minimized = dfa.minimize();
+        assert_eq!(minimized, true);
+        assert_eq!(
+            dfa.table.table,
+            BTreeMap::from([
+                (
+                    "1,3".to_string(),
+                    BTreeMap::from([
+                        ("a".to_string(), "2".to_string()),
+                        ("b".to_string(), "1,3".to_string()),
+                    ]),
+                ),
+                (
+                    "2".to_string(),
+                    BTreeMap::from([
+                        ("a".to_string(), "2".to_string()),
+                        ("b".to_string(), "4".to_string()),
+                    ]),
+                ),
+                (
+                    "4".to_string(),
+                    BTreeMap::from([
+                        ("a".to_string(), "2".to_string()),
+                        ("b".to_string(), "5".to_string()),
+                    ]),
+                ),
+                (
+                    "5".to_string(),
+                    BTreeMap::from([
+                        ("a".to_string(), "2".to_string()),
+                        ("b".to_string(), "1,3".to_string()),
+                    ]),
+                ),
+            ])
+        );
+
+        dfa.simplify_notations();
+        assert_eq!(
+            dfa.table.table,
+            BTreeMap::from([
+                (
+                    "1".to_string(),
+                    BTreeMap::from([
+                        ("a".to_string(), "2".to_string()),
+                        ("b".to_string(), "1".to_string()),
+                    ]),
+                ),
+                (
+                    "2".to_string(),
+                    BTreeMap::from([
+                        ("a".to_string(), "2".to_string()),
+                        ("b".to_string(), "3".to_string()),
+                    ]),
+                ),
+                (
+                    "3".to_string(),
+                    BTreeMap::from([
+                        ("a".to_string(), "2".to_string()),
+                        ("b".to_string(), "4".to_string()),
+                    ]),
+                ),
+                (
+                    "4".to_string(),
+                    BTreeMap::from([
+                        ("a".to_string(), "2".to_string()),
+                        ("b".to_string(), "1".to_string()),
+                    ]),
+                ),
+            ])
+        );
     }
 }
