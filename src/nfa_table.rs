@@ -58,6 +58,7 @@ impl NFATable {
             self.starting_state = state_id;
         }
 
+        // TODO: use RefCell as_ptr instead.
         let ptr = state as *const State;
         if self.visited.contains(&ptr) {
             return;

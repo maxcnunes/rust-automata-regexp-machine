@@ -1,6 +1,6 @@
 use std::{
     cell::RefCell,
-    collections::{HashMap, HashSet},
+    collections::{BTreeMap, HashSet},
     rc::Rc,
 };
 
@@ -10,20 +10,31 @@ use crate::state::State;
 #[derive(Debug, Clone)]
 pub struct DFATable {
     state_count: usize,
-    map_state_ids: HashMap<*const State, usize>,
+    map_state_ids: BTreeMap<*const State, usize>,
     visited: HashSet<*const State>,
 
     pub starting_state: String,
     pub accepting_states: HashSet<String>,
-    pub table: HashMap<String, HashMap<String, String>>,
+    pub table: BTreeMap<String, BTreeMap<String, String>>,
 }
 
 impl DFATable {
+    pub fn new() -> Self {
+        DFATable {
+            state_count: 0,
+            map_state_ids: BTreeMap::new(),
+            visited: HashSet::new(),
+            starting_state: "".to_string(),
+            accepting_states: HashSet::new(),
+            table: BTreeMap::new(),
+        }
+    }
+
     pub fn simplify_notations(&mut self) {
         let mut count = 0_usize;
-        let mut hash: HashMap<String, String> = HashMap::new();
-        let mut new_table = HashMap::with_capacity(self.table.len());
-        let mut new_accepting_states = HashSet::with_capacity(self.accepting_states.len());
+        let mut hash: BTreeMap<String, String> = BTreeMap::new();
+        let mut new_table = BTreeMap::new();
+        let mut new_accepting_states = HashSet::new();
 
         for (root_states_id, transitions) in self.table.iter() {
             let new_root_states_id = hash
@@ -34,8 +45,7 @@ impl DFATable {
                 })
                 .to_owned();
 
-            let mut new_transitions: HashMap<String, String> =
-                HashMap::with_capacity(transitions.len());
+            let mut new_transitions: BTreeMap<String, String> = BTreeMap::new();
 
             for (transition, transition_states_id) in transitions.iter() {
                 let new_transition_states_id = hash
@@ -88,8 +98,8 @@ impl DFATable {
             state_count: 0,
             starting_state: String::new(),
             accepting_states: HashSet::new(),
-            table: HashMap::new(),
-            map_state_ids: HashMap::new(),
+            table: BTreeMap::new(),
+            map_state_ids: BTreeMap::new(),
             visited: HashSet::new(),
         };
 
@@ -115,7 +125,7 @@ impl DFATable {
                     .collect::<Vec<String>>()
                     .join(",");
 
-                let mut row: HashMap<String, String> = HashMap::new();
+                let mut row: BTreeMap<String, String> = BTreeMap::new();
                 println!("  label {:?}", label);
 
                 // Skip the first state, since it is the ε source state.
@@ -272,7 +282,7 @@ mod tests {
     //
     //     assert_eq!(
     //         table.get(&1),
-    //         Some(&HashMap::from([
+    //         Some(&BTreeMap::from([
     //             ("ε*".to_string(), vec![1]),
     //             ("a".to_string(), vec![2]),
     //         ]))
@@ -280,12 +290,12 @@ mod tests {
     //
     //     assert_eq!(
     //         table.get(&2),
-    //         Some(&HashMap::from([("ε*".to_string(), vec![2, 3])]))
+    //         Some(&BTreeMap::from([("ε*".to_string(), vec![2, 3])]))
     //     );
     //
     //     assert_eq!(
     //         table.get(&3),
-    //         Some(&HashMap::from([
+    //         Some(&BTreeMap::from([
     //             ("ε*".to_string(), vec![3]),
     //             ("b".to_string(), vec![4]),
     //         ]))
@@ -293,7 +303,7 @@ mod tests {
     //
     //     assert_eq!(
     //         table.get(&4),
-    //         Some(&HashMap::from([("ε*".to_string(), vec![4])]))
+    //         Some(&BTreeMap::from([("ε*".to_string(), vec![4])]))
     //     );
     // }
 
@@ -344,7 +354,7 @@ mod tests {
 
         assert_eq!(
             dfa_table.table.get(&"1,2,5".to_string()),
-            Some(&HashMap::from([
+            Some(&BTreeMap::from([
                 ("b".to_string(), "6,4".to_string()),
                 ("a".to_string(), "3,4".to_string()),
             ]))
@@ -352,12 +362,12 @@ mod tests {
 
         assert_eq!(
             dfa_table.table.get(&"3,4".to_string()),
-            Some(&HashMap::new())
+            Some(&BTreeMap::new())
         );
 
         assert_eq!(
             dfa_table.table.get(&"6,4".to_string()),
-            Some(&HashMap::new())
+            Some(&BTreeMap::new())
         );
 
         // In this second testing phase we apply the remapping to simplify the state notations.
@@ -404,15 +414,21 @@ mod tests {
 
         assert_eq!(
             dfa_table.table.get(&"1".to_string()),
-            Some(&HashMap::from([
+            Some(&BTreeMap::from([
                 ("b".to_string(), "3".to_string()),
                 ("a".to_string(), "2".to_string()),
             ]))
         );
 
-        assert_eq!(dfa_table.table.get(&"2".to_string()), Some(&HashMap::new()));
+        assert_eq!(
+            dfa_table.table.get(&"2".to_string()),
+            Some(&BTreeMap::new())
+        );
 
-        assert_eq!(dfa_table.table.get(&"3".to_string()), Some(&HashMap::new()));
+        assert_eq!(
+            dfa_table.table.get(&"3".to_string()),
+            Some(&BTreeMap::new())
+        );
     }
 
     // #[test]
@@ -465,7 +481,7 @@ mod tests {
     //
     //     assert_eq!(
     //         table.get(&1),
-    //         Some(&HashMap::from([
+    //         Some(&BTreeMap::from([
     //             ("a".to_string(), vec![2]),
     //             ("ε*".to_string(), vec![1, 2])
     //         ]))
@@ -473,7 +489,7 @@ mod tests {
     //
     //     assert_eq!(
     //         table.get(&2),
-    //         Some(&HashMap::from([("ε*".to_string(), vec![2, 1]),]))
+    //         Some(&BTreeMap::from([("ε*".to_string(), vec![2, 1]),]))
     //     );
     // }
 }

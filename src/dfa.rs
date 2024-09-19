@@ -1,6 +1,6 @@
 use std::{
     cell::RefCell,
-    collections::{HashMap, HashSet},
+    collections::{BTreeMap, HashSet},
     rc::Rc,
 };
 
@@ -33,13 +33,92 @@ impl DFA {
     }
 
     // DFA transition table built from NFA table.
-    pub fn get_transition_table(&self) -> HashMap<String, HashMap<String, String>> {
+    pub fn get_transition_table(&self) -> BTreeMap<String, BTreeMap<String, String>> {
         self.table.table.to_owned()
     }
 
     // Minimize this DFA.
-    pub fn minimize(&self) {
+    // To check whether they are equivalent we should see where we go from each character from these states,
+    // if we go to the states which belong to the same group, the original states are equivalent.
+    // Even if the actual states are different, the important is whether the outgoing state belongs to the same group.
+    pub fn minimize(&mut self) {
         todo!()
+    }
+
+    fn minimize_once(&mut self, groups: &mut Vec<Vec<String>>) -> bool {
+        let groups_len = groups.len();
+        if groups_len == 0 {
+            let mut non_accepting_states = Vec::new();
+            let mut accepting_states = Vec::new();
+
+            for (state, _) in self.table.table.iter() {
+                if self.table.accepting_states.contains(state) {
+                    accepting_states.push(state.to_owned());
+                } else {
+                    non_accepting_states.push(state.to_owned());
+                }
+            }
+
+            groups.push(non_accepting_states);
+            groups.push(accepting_states);
+
+            return true;
+        }
+
+        let mut base_group_iter = groups[0].to_owned().into_iter();
+        let mut state_a = base_group_iter.next().unwrap();
+        let mut new_base_group = vec![state_a.to_owned()];
+
+        while let Some(state_b) = base_group_iter.next() {
+            println!("-----------------");
+            println!("state_a {:?}", state_a);
+            println!("state_b {:?}", state_b);
+
+            let state_a_transitions = self.table.table.get(&state_a).unwrap();
+            let state_b_transitions = self.table.table.get(&state_b).unwrap();
+            println!("state_a_transitions {:#?}", state_a_transitions);
+            println!("state_b_transitions {:#?}", state_b_transitions);
+
+            let mut moved = false;
+
+            for (transition, transition_state_a) in state_a_transitions {
+                let transition_state_b = state_b_transitions.get(transition).unwrap();
+
+                let group = &groups[0];
+                println!("group {:#?}", group);
+                println!(
+                    "contains transition_state_a {:?} {:#?}",
+                    transition_state_a,
+                    group.contains(transition_state_a)
+                );
+                println!(
+                    "contains transition_state_b {:?} {:#?}",
+                    transition_state_b,
+                    group.contains(transition_state_b)
+                );
+                if transition_state_a != transition_state_b
+                    && (!group.contains(transition_state_a) || !group.contains(transition_state_b))
+                {
+                    groups.push(vec![state_b.to_owned()]);
+                    moved = true;
+                }
+            }
+
+            if !moved {
+                new_base_group.push(state_b.to_owned());
+                state_a = state_b;
+            }
+        }
+        println!("END-----------------");
+
+        if groups[0].len() != new_base_group.len() {
+            groups[0] = new_base_group;
+            println!("groups {:#?}", groups);
+            return true;
+        }
+
+        println!("groups {:#?}", groups);
+        false
     }
 
     // Tests whether this DFA accepts the string.
@@ -151,7 +230,7 @@ mod tests {
     //
     //     assert_eq!(
     //         table.get(&1),
-    //         Some(&HashMap::from([
+    //         Some(&BTreeMap::from([
     //             ("ε*".to_string(), vec![1]),
     //             ("a".to_string(), vec![2]),
     //         ]))
@@ -159,12 +238,12 @@ mod tests {
     //
     //     assert_eq!(
     //         table.get(&2),
-    //         Some(&HashMap::from([("ε*".to_string(), vec![2, 3])]))
+    //         Some(&BTreeMap::from([("ε*".to_string(), vec![2, 3])]))
     //     );
     //
     //     assert_eq!(
     //         table.get(&3),
-    //         Some(&HashMap::from([
+    //         Some(&BTreeMap::from([
     //             ("ε*".to_string(), vec![3]),
     //             ("b".to_string(), vec![4]),
     //         ]))
@@ -172,7 +251,7 @@ mod tests {
     //
     //     assert_eq!(
     //         table.get(&4),
-    //         Some(&HashMap::from([("ε*".to_string(), vec![4])]))
+    //         Some(&BTreeMap::from([("ε*".to_string(), vec![4])]))
     //     );
     // }
 
@@ -263,7 +342,7 @@ mod tests {
     //
     //     assert_eq!(
     //         table.get(&1),
-    //         Some(&HashMap::from([
+    //         Some(&BTreeMap::from([
     //             ("a".to_string(), vec![2]),
     //             ("ε*".to_string(), vec![1, 2])
     //         ]))
@@ -271,7 +350,149 @@ mod tests {
     //
     //     assert_eq!(
     //         table.get(&2),
-    //         Some(&HashMap::from([("ε*".to_string(), vec![2, 1]),]))
+    //         Some(&BTreeMap::from([("ε*".to_string(), vec![2, 1]),]))
     //     );
     // }
+
+    #[test]
+    fn minimize_table() {
+        // Given a DFA graph like this:
+        //
+        //                           a           a
+        //                          ___     __________
+        //                         |   \   /         |
+        //                         \   |  |          |
+        //                    a     \ \/ \/   b      |
+        //                 ------> ( s:2 ) -----> ( s:4 )
+        //                /         /\ /\            |
+        //               /          |  |    a        |
+        //  <start> -(s:1)        a |  |________     | b
+        //               \          |           \    |
+        //                \         |            \  \/
+        //                 ------> ( s:3 ) <---- ( s:5 ) -> <end>
+        //                    b    /  /\     b
+        //                        |   |
+        //                        \__/
+        //                          b
+        //
+        // Its DFA table is:
+        //
+        // ┌─────┬───┬───┐
+        // │     │ a │ b │
+        // ├─────┼───┼───┤
+        // │ 1 > │ 2 │ 3 │
+        // ├─────┼───┼───┤
+        // │ 2   │ 2 │ 4 │
+        // ├─────┼───┼───┤
+        // │ 3   │ 2 │ 3 │
+        // ├─────┼───┼───┤
+        // │ 4   │ 2 │ 5 │
+        // ├─────┼───┼───┤
+        // │ 5 ✓ │ 2 │ 3 │
+        // └─────┴───┴───┘
+        //
+        let mut dfa_table = DFATable::new();
+        dfa_table.starting_state = "1".to_string();
+        dfa_table.accepting_states = HashSet::from([("5".to_string())]);
+        dfa_table.table = BTreeMap::from([
+            (
+                "1".to_string(),
+                BTreeMap::from([
+                    ("a".to_string(), "2".to_string()),
+                    ("b".to_string(), "3".to_string()),
+                ]),
+            ),
+            (
+                "2".to_string(),
+                BTreeMap::from([
+                    ("a".to_string(), "2".to_string()),
+                    ("b".to_string(), "4".to_string()),
+                ]),
+            ),
+            (
+                "3".to_string(),
+                BTreeMap::from([
+                    ("a".to_string(), "2".to_string()),
+                    ("b".to_string(), "3".to_string()),
+                ]),
+            ),
+            (
+                "4".to_string(),
+                BTreeMap::from([
+                    ("a".to_string(), "2".to_string()),
+                    ("b".to_string(), "5".to_string()),
+                ]),
+            ),
+            (
+                "5".to_string(),
+                BTreeMap::from([
+                    ("a".to_string(), "2".to_string()),
+                    ("b".to_string(), "3".to_string()),
+                ]),
+            ),
+        ]);
+        println!("test minimize_table table {:#?}", dfa_table);
+
+        let mut dfa = DFA {
+            table: dfa_table.to_owned(),
+        };
+
+        let mut groups = vec![];
+
+        // First step: 0-equivalence
+        println!("------ First step");
+        let minimized = dfa.minimize_once(&mut groups);
+        assert_eq!(minimized, true);
+        assert_eq!(groups.len(), 2);
+
+        assert_eq!(
+            groups[0],
+            [
+                "1".to_string(),
+                "2".to_string(),
+                "3".to_string(),
+                "4".to_string()
+            ]
+        );
+
+        assert_eq!(groups[1], ["5".to_string()]);
+
+        // Second step: 1-equivalence
+        println!("------ Second step");
+        let minimized = dfa.minimize_once(&mut groups);
+        assert_eq!(minimized, true);
+        assert_eq!(groups.len(), 3);
+
+        assert_eq!(
+            groups[0],
+            ["1".to_string(), "2".to_string(), "3".to_string()]
+        );
+
+        assert_eq!(groups[1], ["5".to_string()]);
+        assert_eq!(groups[2], ["4".to_string()]);
+
+        // Third step: 2-equivalence
+        println!("------ Third step");
+        let minimized = dfa.minimize_once(&mut groups);
+        assert_eq!(minimized, true);
+        assert_eq!(groups.len(), 4);
+
+        assert_eq!(groups[0], ["1".to_string(), "3".to_string()]);
+
+        assert_eq!(groups[1], ["5".to_string()]);
+        assert_eq!(groups[2], ["4".to_string()]);
+        assert_eq!(groups[3], ["2".to_string()]);
+
+        // Forth step: 3-equivalence
+        println!("------ Forth step");
+        let minimized = dfa.minimize_once(&mut groups);
+        assert_eq!(minimized, false);
+        assert_eq!(groups.len(), 4);
+
+        assert_eq!(groups[0], ["1".to_string(), "3".to_string()]);
+
+        assert_eq!(groups[1], ["5".to_string()]);
+        assert_eq!(groups[2], ["4".to_string()]);
+        assert_eq!(groups[3], ["2".to_string()]);
+    }
 }
