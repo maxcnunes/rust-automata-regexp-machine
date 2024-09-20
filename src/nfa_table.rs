@@ -4,8 +4,8 @@ use std::{
     rc::Rc,
 };
 
-use crate::nfa::NFA;
 use crate::state::State;
+use crate::{nfa::NFA, state};
 
 #[derive(Debug)]
 pub struct NFATable {
@@ -65,11 +65,11 @@ impl NFATable {
         self.visited.insert(ptr.to_owned());
 
         let mut row: HashMap<String, Vec<usize>> = HashMap::new();
-        row.insert("ε*".to_string(), vec![state_id]);
+        row.insert(state::EPSILON_TRANSITIONS.to_string(), vec![state_id]);
 
         for (t, states) in &state.transitions {
-            let transition_label = match t {
-                'ε' => "ε*".to_string(),
+            let transition_label = match *t {
+                'ε' => state::EPSILON_TRANSITIONS.to_string(),
                 c => c.to_string(),
             };
 

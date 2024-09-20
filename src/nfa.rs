@@ -130,7 +130,7 @@ impl NFA {
             .reduce(|mut prev, mut fragment| {
                 let out = NFA::or_pair(&mut prev, &mut fragment);
 
-                println!("----or out {:#?}", out);
+                // println!("----or out {:#?}", out);
                 out
             })
             .unwrap()

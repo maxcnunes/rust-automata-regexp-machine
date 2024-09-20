@@ -138,11 +138,11 @@ impl DFATable {
         let epsilon_transitions_id = "ε*".to_string();
 
         let nfa_table = nfa.get_transition_table();
-        println!("nfa_table {:#?}", nfa_table);
+        // println!("nfa_table {:#?}", nfa_table);
 
         for state_id in 1..=nfa_table.table.len() {
             let transitions = nfa_table.table.get(&state_id).unwrap();
-            println!("state_id {:?} transitions {:?}", state_id, transitions);
+            // println!("state_id {:?} transitions {:?}", state_id, transitions);
             if transitions.len() == 1 && transitions.get(&epsilon_transitions_id).is_some() {
                 let transition_states = transitions.get(&epsilon_transitions_id).unwrap();
 
@@ -158,28 +158,28 @@ impl DFATable {
                     .join(",");
 
                 let mut row: BTreeMap<String, String> = BTreeMap::new();
-                println!("  label {:?}", label);
+                // println!("  label {:?}", label);
 
                 // Skip the first state, since it is the ε source state.
                 // Example: loop over [1, 2, 5] from 'ε*', skipping the first state.
                 for state_id in transition_states.iter().skip(1) {
-                    println!("    state_id {:?}", state_id);
+                    // println!("    state_id {:?}", state_id);
                     // Example: first itration, get { a: [ 3 ], 'ε*': [ 2 ] } for state 2.
                     let child_transitions = nfa_table.table.get(&state_id).unwrap();
-                    println!("    child_transitions {:?}", child_transitions);
+                    // println!("    child_transitions {:?}", child_transitions);
 
                     for (child_state_id, child_states) in child_transitions {
-                        println!(
-                            "      child_state_id {:?} child_states {:?}",
-                            child_state_id, child_states
-                        );
+                        // println!(
+                        //     "      child_state_id {:?} child_states {:?}",
+                        //     child_state_id, child_states
+                        // );
                         if *child_state_id != epsilon_transitions_id {
                             // Example: loop over [ 3 ] for the "a" transiction.
                             for inner_state_id in child_states {
-                                println!("        inner_state_id {:?}", inner_state_id);
+                                // println!("        inner_state_id {:?}", inner_state_id);
                                 // Example: get { 'ε*': [ 3, 4 ] } for state 3.
                                 let transitions = nfa_table.table.get(&inner_state_id).unwrap();
-                                println!("        transitions {:?}", transitions);
+                                // println!("        transitions {:?}", transitions);
                                 if transitions.len() == 1
                                     && transitions.get(&epsilon_transitions_id).is_some()
                                 {
@@ -192,10 +192,10 @@ impl DFATable {
                                         .map(|&n| n.to_string())
                                         .collect::<Vec<String>>()
                                         .join(",");
-                                    println!(
-                                        "        transition_states_label {:?}",
-                                        transition_states_label
-                                    );
+                                    // println!(
+                                    //     "        transition_states_label {:?}",
+                                    //     transition_states_label
+                                    // );
 
                                     // Example: insert { "a": "3,4" } to "1,2,5" label row.
                                     row.insert(
@@ -372,7 +372,7 @@ mod tests {
         // }
         let nfa = NFA::or(vec![NFA::char('a'), NFA::char('b')]);
         let mut dfa_table = DFATable::from(&nfa);
-        println!("test get_transition_table table {:#?}", dfa_table);
+        // println!("test get_transition_table table {:#?}", dfa_table);
 
         assert_eq!(dfa_table.starting_state, "1,2,5".to_string());
 
@@ -432,7 +432,7 @@ mod tests {
         //   "3": {},
         // }
         dfa_table.simplify_notations();
-        println!("test get_transition_table remapped table {:#?}", dfa_table);
+        // println!("test get_transition_table remapped table {:#?}", dfa_table);
 
         assert_eq!(dfa_table.starting_state, "1".to_string());
 

@@ -5,6 +5,7 @@ use std::{
 };
 
 pub static EPSILON: char = 'ε';
+pub static EPSILON_TRANSITIONS: &str = "ε*";
 
 // TODO: consider removing Rc+RefCell trates
 #[derive(Debug, Clone, PartialEq, Eq)]

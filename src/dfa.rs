@@ -89,14 +89,14 @@ impl DFA {
         let mut new_base_group = vec![state_a.to_owned()];
 
         while let Some(state_b) = base_group_iter.next() {
-            println!("-----------------");
-            println!("state_a {:?}", state_a);
-            println!("state_b {:?}", state_b);
+            // println!("-----------------");
+            // println!("state_a {:?}", state_a);
+            // println!("state_b {:?}", state_b);
 
             let state_a_transitions = self.table.table.get(&state_a).unwrap();
             let state_b_transitions = self.table.table.get(&state_b).unwrap();
-            println!("state_a_transitions {:#?}", state_a_transitions);
-            println!("state_b_transitions {:#?}", state_b_transitions);
+            // println!("state_a_transitions {:#?}", state_a_transitions);
+            // println!("state_b_transitions {:#?}", state_b_transitions);
 
             let mut moved = false;
 
@@ -104,17 +104,17 @@ impl DFA {
                 let transition_state_b = state_b_transitions.get(transition).unwrap();
 
                 let group = &groups[0];
-                println!("group {:#?}", group);
-                println!(
-                    "contains transition_state_a {:?} {:#?}",
-                    transition_state_a,
-                    group.contains(transition_state_a)
-                );
-                println!(
-                    "contains transition_state_b {:?} {:#?}",
-                    transition_state_b,
-                    group.contains(transition_state_b)
-                );
+                // println!("group {:#?}", group);
+                // println!(
+                //     "contains transition_state_a {:?} {:#?}",
+                //     transition_state_a,
+                //     group.contains(transition_state_a)
+                // );
+                // println!(
+                //     "contains transition_state_b {:?} {:#?}",
+                //     transition_state_b,
+                //     group.contains(transition_state_b)
+                // );
                 if transition_state_a != transition_state_b
                     && (!group.contains(transition_state_a) || !group.contains(transition_state_b))
                 {
@@ -128,28 +128,28 @@ impl DFA {
                 state_a = state_b;
             }
         }
-        println!("END-----------------");
+        // println!("END-----------------");
 
         if groups[0].len() != new_base_group.len() {
             groups[0] = new_base_group;
-            println!("groups {:#?}", groups);
+            // println!("groups {:#?}", groups);
             return true;
         }
 
-        println!("groups {:#?}", groups);
+        // println!("groups {:#?}", groups);
         false
     }
 
     // Tests whether this DFA accepts the string.
     fn test(&self, string: &String) -> bool {
         let table = self.get_transition_table();
-        println!("test table={:#?}", &table);
+        // println!("test table={:#?}", &table);
 
         let mut state = self.get_starting_state();
-        println!("test starting_state={:#?}", &state);
+        // println!("test starting_state={:#?}", &state);
 
         for c in string.chars() {
-            println!("test c={c} state={:?}", state);
+            // println!("test c={c} state={:?}", state);
             let looking_state = table.get(&state).unwrap().get(&c.to_string());
 
             if let Some(s) = looking_state {
@@ -450,7 +450,7 @@ mod tests {
                 ]),
             ),
         ]);
-        println!("test minimize_table table {:#?}", dfa_table);
+        // println!("test minimize_table table {:#?}", dfa_table);
 
         let mut dfa = DFA {
             table: dfa_table.to_owned(),
@@ -459,7 +459,7 @@ mod tests {
         let mut groups = vec![];
 
         // First step: 0-equivalence
-        println!("------ First step");
+        // println!("------ First step");
         let minimized = dfa.minimize_once(&mut groups);
         assert_eq!(minimized, true);
         assert_eq!(groups.len(), 2);
@@ -477,7 +477,7 @@ mod tests {
         assert_eq!(groups[1], ["5".to_string()]);
 
         // Second step: 1-equivalence
-        println!("------ Second step");
+        // println!("------ Second step");
         let minimized = dfa.minimize_once(&mut groups);
         assert_eq!(minimized, true);
         assert_eq!(groups.len(), 3);
@@ -491,7 +491,7 @@ mod tests {
         assert_eq!(groups[2], ["4".to_string()]);
 
         // Third step: 2-equivalence
-        println!("------ Third step");
+        // println!("------ Third step");
         let minimized = dfa.minimize_once(&mut groups);
         assert_eq!(minimized, true);
         assert_eq!(groups.len(), 4);
@@ -503,7 +503,7 @@ mod tests {
         assert_eq!(groups[3], ["2".to_string()]);
 
         // Forth step: 3-equivalence
-        println!("------ Forth step");
+        // println!("------ Forth step");
         let minimized = dfa.minimize_once(&mut groups);
         assert_eq!(minimized, false);
         assert_eq!(groups.len(), 4);
@@ -591,7 +591,7 @@ mod tests {
                 ]),
             ),
         ]);
-        println!("test minimize_table table {:#?}", dfa_table);
+        // println!("test minimize_table table {:#?}", dfa_table);
 
         let mut dfa = DFA {
             table: dfa_table.to_owned(),

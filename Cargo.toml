@@ -2,3 +2,7 @@
 name = "rust-automata-regexp-machine"
 version = "0.1.0"
 edition = "2021"
+
+[dependencies]
+clap = { version = "4.5.17", features = ["derive"] }
+term-table = "1.4.0"
