@@ -9,10 +9,6 @@ use crate::state::State;
 
 #[derive(Debug, Clone)]
 pub struct DFATable {
-    state_count: usize,
-    map_state_ids: BTreeMap<*const State, usize>,
-    visited: HashSet<*const State>,
-
     pub starting_state: String,
     pub accepting_states: HashSet<String>,
     pub table: BTreeMap<String, BTreeMap<String, String>>,
@@ -21,9 +17,6 @@ pub struct DFATable {
 impl DFATable {
     pub fn new() -> Self {
         DFATable {
-            state_count: 0,
-            map_state_ids: BTreeMap::new(),
-            visited: HashSet::new(),
             starting_state: "".to_string(),
             accepting_states: HashSet::new(),
             table: BTreeMap::new(),
@@ -137,12 +130,9 @@ impl DFATable {
         //   '6,4': {},
         // }
         let mut builder = DFATable {
-            state_count: 0,
             starting_state: String::new(),
             accepting_states: HashSet::new(),
             table: BTreeMap::new(),
-            map_state_ids: BTreeMap::new(),
-            visited: HashSet::new(),
         };
 
         let epsilon_transitions_id = "ε*".to_string();
