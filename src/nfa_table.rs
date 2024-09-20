@@ -10,8 +10,8 @@ use crate::state::State;
 #[derive(Debug)]
 pub struct NFATable {
     state_count: usize,
-    map_state_ids: HashMap<*const State, usize>,
-    visited: HashSet<*const State>,
+    map_state_ids: HashMap<*mut State, usize>,
+    visited: HashSet<*mut State>,
 
     pub starting_state: usize,
     pub accepting_states: HashSet<usize>,
@@ -40,14 +40,15 @@ impl NFATable {
             table: HashMap::new(),
         };
 
-        builder.walk_state(nfa.in_state.to_owned());
+        builder.walk_state(&nfa.in_state);
 
         builder
     }
 
-    fn walk_state(&mut self, ref_state: Rc<RefCell<State>>) {
-        let state = &*ref_state.borrow();
-        let state_id = self.get_state_id(state);
+    fn walk_state(&mut self, ref_state: &Rc<RefCell<State>>) {
+        let ptr = ref_state.as_ptr();
+        let state = ref_state.borrow();
+        let state_id = self.get_state_id(ptr);
         // println!(
         //     "walk_state state_id={} table_len={}",
         //     state_id,
@@ -58,8 +59,6 @@ impl NFATable {
             self.starting_state = state_id;
         }
 
-        // TODO: use RefCell as_ptr instead.
-        let ptr = state as *const State;
         if self.visited.contains(&ptr) {
             return;
         }
@@ -77,9 +76,9 @@ impl NFATable {
             let ids = row.entry(transition_label).or_insert(vec![]);
 
             for child_state in states {
-                let child_state_id = self.get_state_id(&child_state.borrow());
+                let child_state_id = self.get_state_id(child_state.as_ptr());
                 ids.push(child_state_id);
-                self.walk_state(child_state.to_owned());
+                self.walk_state(&child_state);
             }
         }
 
@@ -90,9 +89,7 @@ impl NFATable {
         self.table.insert(state_id, row.to_owned());
     }
 
-    fn get_state_id(&mut self, state: &State) -> usize {
-        let ptr = state as *const State;
-
+    fn get_state_id(&mut self, ptr: *mut State) -> usize {
         let state_id = self.map_state_ids.entry(ptr).or_insert_with(|| {
             self.state_count += 1;
             self.state_count
