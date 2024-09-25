@@ -71,9 +71,9 @@ fn main() {
     println!("");
     print_dfa_table(&dfa);
 
-    let input = "a|b";
-    let tokens = ast::lexer::tokens(input);
-    println!("Tokens: {:#?}", tokens);
+    // let input = "a|b";
+    // let tokens = ast::lexer::tokens(input);
+    // println!("Tokens: {:#?}", tokens);
 }
 
 fn print_nfa_table(nfa_table: &NFATable) {

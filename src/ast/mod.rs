@@ -1,307 +1,138 @@
-use self::lexer::Token;
-
-pub mod lexer;
+// This module was heavily based and copied from https://github.com/rust-lang/regex/blob/master/regex-syntax/src/ast/mod.rs
 pub mod parser;
 
-#[derive(Debug, PartialEq)]
-pub struct AST {
-    // type: "RegExp",
-    body: Option<PatternKind>, // flags: String,
+/// An Abstract syntax tree for single regular expression.
+#[derive(Debug, PartialEq, Eq)]
+pub enum AST {
+    /// An empty regex that matches everything.
+    Empty(Box<Span>),
+    /// A single character literal.
+    Literal(Box<Literal>),
+    /// An alternation of regular expressions.
+    Alternation(Box<Alternation>),
+    /// A concatenation of regular expressions.
+    Concat(Box<Concat>),
 }
 
 impl AST {
-    pub fn new() -> Self {
-        Self { body: None }
+    /// Create a "empty" AST item.
+    fn empty(e: Span) -> AST {
+        AST::Empty(Box::new(e))
     }
 
-    // fn add_char(&mut self, node: &mut Option<PatternKind>, parent: &mut Option<PatternKind>) {
-    //     let c = self.parse_char();
-    //     match *node {
-    //         Some(pc @ PatternKind::Char(_)) => {
-    //             let expressions = vec![Box::new(pc), Box::new(c)];
-    //             let alt = PatternKind::Alternative(Alternative { expressions });
-    //             *node = Some(alt);
-    //         }
-    //         None => unreachable!(),
-    //         _ => unreachable!(),
-    //     }
-    // }
+    /// Create a "literal" AST item.
+    pub fn literal(e: Literal) -> AST {
+        AST::Literal(Box::new(e))
+    }
+
+    /// Create a "concat" AST item.
+    pub fn concat(e: Concat) -> AST {
+        AST::Concat(Box::new(e))
+    }
+
+    /// Create an "alternation" AST item.
+    pub fn alternation(e: Alternation) -> AST {
+        AST::Alternation(Box::new(e))
+    }
 }
 
-#[derive(Debug, PartialEq)]
-pub enum PatternKind {
-    Char(Char),
-    Alternative(Alternative),
-    Disjunction(Disjunction),
-    Empty,
+/// Represents the position information of a single AST item.
+#[derive(Debug, Eq, PartialEq)]
+pub struct Span {
+    pub start: Position,
+    pub end: Position,
 }
 
-#[derive(Debug, PartialEq)]
-pub struct Char {
-    value: char,
-    token: Token,
+impl Span {
+    /// Create a new span with the given positions.
+    pub fn new(start: Position, end: Position) -> Span {
+        Span { start, end }
+    }
+
+    /// a new span with the given position as the start and end.
+    pub fn splat(pos: Position) -> Span {
+        Span::new(pos, pos)
+    }
 }
 
-#[derive(Debug, PartialEq)]
-pub struct Alternative {
-    expressions: Vec<Box<PatternKind>>,
+/// A single position in a regular expression.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct Position {
+    pub offset: usize,
 }
 
-#[derive(Debug, PartialEq)]
-pub struct Disjunction {
-    left: Box<PatternKind>,
-    right: Option<Box<PatternKind>>,
-}
-//
-// #[derive(Debug, PartialEq)]
-// pub enum DisjunctionItem {
-//     Char(Char),
-//     Alternative(Alternative),
-// }
-
-pub fn parse(input: &str) -> AST {
-    let tokens = lexer::tokens(&input);
-    let mut ast = AST::new();
-    let mut p = parser::Parser::new(tokens, &mut ast);
-    p.parse();
-    ast
+impl Position {
+    fn new(offset: usize) -> Position {
+        Position { offset }
+    }
 }
 
-// #[cfg(test)]
-// mod tests {
-//     use super::*;
-//
-//     #[test]
-//     fn parse_single_char() {
-//         // {
-//         //   "type": "RegExp",
-//         //   "body": {
-//         //     "type": "Char",
-//         //     "value": "a",
-//         //     "kind": "simple",
-//         //     "symbol": "a",
-//         //     "codePoint": 97
-//         //   },
-//         //   "flags": ""
-//         // }
-//         let input = "a";
-//         let ast = parse(input);
-//         dbg!(&ast);
-//
-//         assert_eq!(
-//             ast,
-//             AST {
-//                 body: PatternKind::Char(Char {
-//                     value: 'a',
-//                     token: Token {
-//                         kind: lexer::TokenKind::Char,
-//                         span: lexer::TextSpan {
-//                             start: 0,
-//                             end: 1,
-//                             literal: "a".to_string(),
-//                         },
-//                     },
-//                 }),
-//             }
-//         );
-//     }
-//
-//     #[test]
-//     fn parse_multiple_chars_alternative() {
-//         // {
-//         //   "type": "RegExp",
-//         //   "body": {
-//         //     "type": "Alternative",
-//         //     "expressions": [
-//         //       {
-//         //         "type": "Char",
-//         //         "value": "a",
-//         //         "kind": "simple",
-//         //         "symbol": "a",
-//         //         "codePoint": 97
-//         //       },
-//         //       {
-//         //         "type": "Char",
-//         //         "value": "b",
-//         //         "kind": "simple",
-//         //         "symbol": "b",
-//         //         "codePoint": 98
-//         //       },
-//         //     ]
-//         //   },
-//         //   "flags": ""
-//         // }
-//         let input = "ab";
-//         let ast = parse(input);
-//         dbg!(&ast);
-//
-//         assert_eq!(
-//             ast.body,
-//             PatternKind::Alternative(Alternative {
-//                 expressions: vec![
-//                     Box::new(PatternKind::Char(Char {
-//                         value: 'a',
-//                         token: Token {
-//                             kind: lexer::TokenKind::Char,
-//                             span: lexer::TextSpan {
-//                                 start: 0,
-//                                 end: 1,
-//                                 literal: "a".to_string(),
-//                             },
-//                         },
-//                     })),
-//                     Box::new(PatternKind::Char(Char {
-//                         value: 'b',
-//                         token: Token {
-//                             kind: lexer::TokenKind::Char,
-//                             span: lexer::TextSpan {
-//                                 start: 1,
-//                                 end: 2,
-//                                 literal: "b".to_string(),
-//                             },
-//                         },
-//                     })),
-//                 ],
-//             })
-//         );
-//     }
-//
-//     #[test]
-//     fn parse_disjunction_left_char_right_char() {
-//         // {
-//         //   "type": "RegExp",
-//         //   "body": {
-//         //     "type": "Disjunction",
-//         //     "left": {
-//         //       "type": "Char",
-//         //       "value": "a",
-//         //       "kind": "simple",
-//         //       "symbol": "a",
-//         //       "codePoint": 97
-//         //     },
-//         //     "right": {
-//         //       "type": "Char",
-//         //       "value": "b",
-//         //       "kind": "simple",
-//         //       "symbol": "b",
-//         //       "codePoint": 98
-//         //     }
-//         //   },
-//         //   "flags": ""
-//         // }
-//         let input = "a|b";
-//         let ast = parse(input);
-//         dbg!(&ast);
-//
-//         assert_eq!(
-//             ast.body,
-//             PatternKind::Disjunction(Disjunction {
-//                 left: Box::new(PatternKind::Char(Char {
-//                     value: 'a',
-//                     token: Token {
-//                         kind: lexer::TokenKind::Char,
-//                         span: lexer::TextSpan {
-//                             start: 0,
-//                             end: 1,
-//                             literal: "a".to_string(),
-//                         },
-//                     },
-//                 })),
-//                 right: Box::new(PatternKind::Char(Char {
-//                     value: 'b',
-//                     token: Token {
-//                         kind: lexer::TokenKind::Char,
-//                         span: lexer::TextSpan {
-//                             start: 2,
-//                             end: 3,
-//                             literal: "b".to_string(),
-//                         },
-//                     },
-//                 })),
-//             },)
-//         );
-//     }
-//
-//     #[test]
-//     fn parse_disjunction_left_char_right_alternative() {
-//         // {
-//         //   "type": "RegExp",
-//         //   "body": {
-//         //     "type": "Disjunction",
-//         //     "left": {
-//         //       "type": "Char",
-//         //       "value": "a",
-//         //       "kind": "simple",
-//         //       "symbol": "a",
-//         //       "codePoint": 97
-//         //     },
-//         //     "right": {
-//         //       "type": "Alternative",
-//         //       "expressions": [
-//         //         {
-//         //           "type": "Char",
-//         //           "value": "b",
-//         //           "kind": "simple",
-//         //           "symbol": "b",
-//         //           "codePoint": 98
-//         //         },
-//         //         {
-//         //           "type": "Char",
-//         //           "value": "c",
-//         //           "kind": "simple",
-//         //           "symbol": "c",
-//         //           "codePoint": 99
-//         //         }
-//         //       ]
-//         //     }
-//         //   },
-//         //   "flags": ""
-//         // }
-//         let input = "a|bc";
-//         let ast = parse(input);
-//         dbg!(&ast);
-//
-//         assert_eq!(
-//             ast.body,
-//             PatternKind::Disjunction(Disjunction {
-//                 left: Box::new(PatternKind::Char(Char {
-//                     value: 'a',
-//                     token: Token {
-//                         kind: lexer::TokenKind::Char,
-//                         span: lexer::TextSpan {
-//                             start: 0,
-//                             end: 1,
-//                             literal: "a".to_string(),
-//                         },
-//                     },
-//                 })),
-//                 right: Box::new(PatternKind::Alternative(Alternative {
-//                     expressions: vec![
-//                         Box::new(PatternKind::Char(Char {
-//                             value: 'b',
-//                             token: Token {
-//                                 kind: lexer::TokenKind::Char,
-//                                 span: lexer::TextSpan {
-//                                     start: 1,
-//                                     end: 2,
-//                                     literal: "b".to_string(),
-//                                 },
-//                             },
-//                         })),
-//                         Box::new(PatternKind::Char(Char {
-//                             value: 'c',
-//                             token: Token {
-//                                 kind: lexer::TokenKind::Char,
-//                                 span: lexer::TextSpan {
-//                                     start: 2,
-//                                     end: 3,
-//                                     literal: "c".to_string(),
-//                                 },
-//                             },
-//                         })),
-//                     ],
-//                 }))
-//             })
-//         );
-//     }
-// }
+/// A single literal expression.
+#[derive(Debug, Eq, PartialEq)]
+pub struct Literal {
+    pub span: Span,
+    pub kind: LiteralKind,
+    pub c: char,
+}
+
+/// The kind of a single literal expression.
+#[derive(Debug, Eq, PartialEq)]
+pub enum LiteralKind {
+    /// The literal is written verbatim.
+    Verbatim,
+}
+
+/// A concatenation of regular expressions.
+#[derive(Debug, Eq, PartialEq)]
+pub struct Concat {
+    /// The span of the concatenation.
+    pub span: Span,
+    /// The concatenation regular expressions.
+    pub asts: Vec<AST>,
+}
+
+impl Concat {
+    /// Return a concatenation as an AST.
+    fn into_ast(mut self) -> AST {
+        match self.asts.len() {
+            0 => AST::empty(self.span),
+            1 => self.asts.pop().unwrap(),
+            _ => AST::concat(self),
+        }
+    }
+}
+
+/// An alternation of regular expressions.
+#[derive(Debug, Eq, PartialEq)]
+pub struct Alternation {
+    /// The span of the alternation.
+    pub span: Span,
+    /// The alternate regular expressions.
+    pub asts: Vec<AST>,
+}
+
+impl Alternation {
+    /// Return an alternation as an AST.
+    fn into_ast(mut self) -> AST {
+        match self.asts.len() {
+            0 => AST::empty(self.span),
+            1 => self.asts.pop().unwrap(),
+            _ => AST::alternation(self),
+        }
+    }
+}
+
+/// An error that occurred while parsing a regular expression.
+#[derive(Debug, Eq, PartialEq)]
+pub struct Error {
+    /// The kind of the error.
+    kind: ErrorKind,
+    /// The original pattern that the parser generated the error from.
+    pattern: String,
+    /// The span of this error.
+    span: Span,
+}
+
+/// The type of an error that occurred while building an AST.
+#[derive(Debug, Eq, PartialEq)]
+pub enum ErrorKind {}
