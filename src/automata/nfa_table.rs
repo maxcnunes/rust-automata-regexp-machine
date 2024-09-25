@@ -5,7 +5,7 @@ use std::{
 };
 
 use crate::state::State;
-use crate::{nfa::NFA, state};
+use crate::{automata::nfa::NFA, state};
 
 #[derive(Debug)]
 pub struct NFATable {

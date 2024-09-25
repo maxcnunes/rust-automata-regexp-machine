@@ -1,10 +1,6 @@
-use std::{
-    cell::RefCell,
-    collections::{BTreeMap, HashSet},
-    rc::Rc,
-};
+use std::collections::{BTreeMap, HashSet};
 
-use crate::{dfa_table::DFATable, nfa::NFA};
+use crate::automata::{dfa_table::DFATable, nfa::NFA};
 
 #[derive(Debug, Clone)]
 pub struct DFA {
@@ -165,7 +161,7 @@ impl DFA {
 
 #[cfg(test)]
 mod tests {
-    use crate::dfa::DFA;
+    use crate::automata::dfa::DFA;
 
     use super::*;
 

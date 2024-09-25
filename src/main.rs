@@ -1,22 +1,11 @@
 mod ast;
-mod dfa;
-mod dfa_table;
-mod nfa;
-mod nfa_table;
-mod state;
+mod automata;
 
-use std::{
-    cmp::Ordering,
-    collections::{BTreeMap, HashSet},
-};
-
-use dfa::DFA;
-use dfa_table::DFATable;
-use nfa::NFA;
-use nfa_table::NFATable;
+use automata::{dfa::DFA, nfa::NFA, nfa_table::NFATable, state};
+use std::{cmp::Ordering, collections::HashSet};
 
 use clap::Parser;
-use term_table::{row, row::Row, rows, table_cell::*, Table, TableStyle};
+use term_table::{row::Row, table_cell::*, Table, TableStyle};
 
 /// Automata RegExp machine
 #[derive(Parser, Debug)]

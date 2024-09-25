@@ -1,11 +1,6 @@
-use std::{
-    cell::RefCell,
-    collections::{BTreeMap, HashMap, HashSet},
-    rc::Rc,
-};
+use std::collections::{BTreeMap, HashMap, HashSet};
 
-use crate::nfa::NFA;
-use crate::state::State;
+use crate::automata::nfa::NFA;
 
 #[derive(Debug, Clone)]
 pub struct DFATable {

@@ -5,7 +5,7 @@ use std::{
 };
 
 use crate::{
-    nfa_table::NFATable,
+    automata::nfa_table::NFATable,
     state::{State, EPSILON},
 };
 
