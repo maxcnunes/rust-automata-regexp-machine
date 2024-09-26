@@ -9,7 +9,7 @@ use crate::{
     state::{State, EPSILON},
 };
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct NFA {
     pub in_state: Rc<RefCell<State>>,
     pub out_state: Rc<RefCell<State>>,
@@ -19,6 +19,19 @@ impl NFA {
     // Tests whether this NFA matches the string.
     fn test(&self, string: &mut String) -> bool {
         self.in_state.borrow().test(string, &mut HashSet::new())
+    }
+
+    pub fn empty() -> NFA {
+        NFA {
+            in_state: Rc::new(RefCell::new(State {
+                accepting: false,
+                transitions: HashMap::new(),
+            })),
+            out_state: Rc::new(RefCell::new(State {
+                accepting: true,
+                transitions: HashMap::new(),
+            })),
+        }
     }
 
     // Single char machine.

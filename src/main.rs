@@ -1,11 +1,15 @@
 mod ast;
 mod automata;
+mod error;
+mod regex;
 
 use automata::{dfa::DFA, nfa::NFA, nfa_table::NFATable, state};
 use std::{cmp::Ordering, collections::HashSet};
 
 use clap::Parser;
 use term_table::{row::Row, table_cell::*, Table, TableStyle};
+
+use crate::regex::Regex;
 
 /// Automata RegExp machine
 #[derive(Parser, Debug)]
@@ -63,6 +67,10 @@ fn main() {
     // let input = "a|b";
     // let tokens = ast::lexer::tokens(input);
     // println!("Tokens: {:#?}", tokens);
+
+    let input = "a";
+    let r = Regex::new(input).unwrap();
+    r.test();
 }
 
 fn print_nfa_table(nfa_table: &NFATable) {

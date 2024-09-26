@@ -133,6 +133,37 @@ pub struct Error {
     span: Span,
 }
 
+impl Error {
+    /// Return the type of this error.
+    pub fn kind(&self) -> &ErrorKind {
+        &self.kind
+    }
+
+    /// The original pattern string in which this error occurred.
+    ///
+    /// Every span reported by this error is reported in terms of this string.
+    pub fn pattern(&self) -> &str {
+        &self.pattern
+    }
+
+    /// Return the span at which this error occurred.
+    pub fn span(&self) -> &Span {
+        &self.span
+    }
+}
+
+impl core::fmt::Display for Error {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        crate::error::Formatter::from(self).fmt(f)
+    }
+}
+
 /// The type of an error that occurred while building an AST.
 #[derive(Debug, Eq, PartialEq)]
 pub enum ErrorKind {}
+
+impl core::fmt::Display for ErrorKind {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        Ok(())
+    }
+}

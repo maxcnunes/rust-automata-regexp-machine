@@ -49,7 +49,7 @@ struct ParserI<'s, P> {
 
 impl Parser {
     /// Create a new parser with default configuration.
-    fn new() -> Parser {
+    pub fn new() -> Parser {
         Parser {
             pos: Cell::new(ast::Position { offset: 0 }),
             stack_group: RefCell::new(vec![]),
