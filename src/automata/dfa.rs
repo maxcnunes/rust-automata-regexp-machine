@@ -9,13 +9,21 @@ pub struct DFA {
 
 impl DFA {
     pub fn from(nfa: &NFA) -> Self {
-        DFA {
+        dbg!(&nfa);
+        let d = DFA {
             table: DFATable::from(nfa),
-        }
+        };
+        dbg!(&d);
+        d
     }
 
     // DFA alphabet. Same as in NFA, except ε.
     pub fn get_alphabet() -> HashSet<String> {
+        todo!()
+    }
+
+    // Accepting states (calculated during table build).
+    pub fn get_starting_states(&self) -> HashSet<String> {
         todo!()
     }
 
@@ -137,15 +145,19 @@ impl DFA {
     }
 
     // Tests whether this DFA accepts the string.
-    fn test(&self, string: &String) -> bool {
+    pub fn test(&self, string: &str) -> bool {
+        dbg!(&self);
         let table = self.get_transition_table();
         // println!("test table={:#?}", &table);
+        dbg!(&table);
 
         let mut state = self.get_starting_state();
         // println!("test starting_state={:#?}", &state);
+        dbg!(&state);
 
         for c in string.chars() {
             // println!("test c={c} state={:?}", state);
+            dbg!(&c);
             let looking_state = table.get(&state).unwrap().get(&c.to_string());
 
             if let Some(s) = looking_state {

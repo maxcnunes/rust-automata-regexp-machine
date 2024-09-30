@@ -70,7 +70,7 @@ fn main() {
 
     let input = "a";
     let r = Regex::new(input).unwrap();
-    r.test();
+    r.test("a");
 }
 
 fn print_nfa_table(nfa_table: &NFATable) {

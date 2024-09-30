@@ -2,6 +2,8 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 
 use crate::automata::nfa::NFA;
 
+use super::nfa_table::NFATable;
+
 #[derive(Debug, Clone)]
 pub struct DFATable {
     pub starting_state: String,
@@ -103,125 +105,142 @@ impl DFATable {
     }
 
     pub fn from(nfa: &NFA) -> Self {
-        // Epsilon closure (denotaed as "ε*"): set of states reacheable from this state,
-        // following only ε-transitions. Which means, it contains the state of it self and
-        // the states it is transition to.
-        //
-        // Example table structure for the NFA with regexp /a|b/:
-        // {
-        //   '1': { 'ε*': [ 1, 2, 5 ] },
-        //   '2': { a: [ 3 ], 'ε*': [ 2 ] },
-        //   '3': { 'ε*': [ 3, 4 ] },
-        //   '4': { 'ε*': [ 4 ] },
-        //   '5': { b: [ 6 ], 'ε*': [ 5 ] },
-        //   '6': { 'ε*': [ 6, 4 ] },
-        // }
-        //
-        // It will be converted to DFA table like this:
-        //
-        // {
-        //   '1,2,5': { 'a': '3,4', 'b': '6,4' },
-        //   '3,4': {},
-        //   '6,4': {},
-        // }
-        let mut builder = DFATable {
-            starting_state: String::new(),
-            accepting_states: HashSet::new(),
-            table: BTreeMap::new(),
-        };
+        let mut dfa_table = DFATable::new();
 
         let epsilon_transitions_id = "ε*".to_string();
 
         let nfa_table = nfa.get_transition_table();
-        // println!("nfa_table {:#?}", nfa_table);
+        println!("nfa_table {:#?}", nfa_table);
 
-        for state_id in 1..=nfa_table.table.len() {
-            let transitions = nfa_table.table.get(&state_id).unwrap();
-            // println!("state_id {:?} transitions {:?}", state_id, transitions);
-            if transitions.len() == 1 && transitions.get(&epsilon_transitions_id).is_some() {
-                let transition_states = transitions.get(&epsilon_transitions_id).unwrap();
+        let alphabet = dfa_table.get_alphabet(&nfa_table);
 
-                // There is only the epsilon transition, we don't record it into the DFA table in this case.
-                if transition_states.len() == 1 {
-                    continue;
-                }
+        let nfa_row_starting_state_transitions = nfa_table
+            .table
+            .get(&1)
+            .expect("expected NFA table to have a state with key 1")
+            .get(&epsilon_transitions_id)
+            .expect("expected NFA table first row to have transition states for the epsilon closure column");
 
-                let label: String = transition_states
+        let mut row: BTreeMap<String, String> = BTreeMap::new();
+        let mut new_states_bucket: Vec<Vec<usize>> = vec![];
+
+        for c in alphabet.iter() {
+            if let Some(ids) =
+                DFATable::find_epislon_closure(&c, &nfa_row_starting_state_transitions, &nfa_table)
+            {
+                let states = ids
                     .iter()
                     .map(|&n| n.to_string())
                     .collect::<Vec<String>>()
                     .join(",");
 
-                let mut row: BTreeMap<String, String> = BTreeMap::new();
-                // println!("  label {:?}", label);
+                println!("found for char {c} new state={:?}", ids);
 
-                // Skip the first state, since it is the ε source state.
-                // Example: loop over [1, 2, 5] from 'ε*', skipping the first state.
-                for state_id in transition_states.iter().skip(1) {
-                    // println!("    state_id {:?}", state_id);
-                    // Example: first itration, get { a: [ 3 ], 'ε*': [ 2 ] } for state 2.
-                    let child_transitions = nfa_table.table.get(&state_id).unwrap();
-                    // println!("    child_transitions {:?}", child_transitions);
-
-                    for (child_state_id, child_states) in child_transitions {
-                        // println!(
-                        //     "      child_state_id {:?} child_states {:?}",
-                        //     child_state_id, child_states
-                        // );
-                        if *child_state_id != epsilon_transitions_id {
-                            // Example: loop over [ 3 ] for the "a" transiction.
-                            for inner_state_id in child_states {
-                                // println!("        inner_state_id {:?}", inner_state_id);
-                                // Example: get { 'ε*': [ 3, 4 ] } for state 3.
-                                let transitions = nfa_table.table.get(&inner_state_id).unwrap();
-                                // println!("        transitions {:?}", transitions);
-                                if transitions.len() == 1
-                                    && transitions.get(&epsilon_transitions_id).is_some()
-                                {
-                                    // Example: get [ 3, 4 ] for transition 'ε*'.
-                                    let transition_states =
-                                        transitions.get(&epsilon_transitions_id).unwrap();
-
-                                    let transition_states_label = transition_states
-                                        .iter()
-                                        .map(|&n| n.to_string())
-                                        .collect::<Vec<String>>()
-                                        .join(",");
-                                    // println!(
-                                    //     "        transition_states_label {:?}",
-                                    //     transition_states_label
-                                    // );
-
-                                    // Example: insert { "a": "3,4" } to "1,2,5" label row.
-                                    row.insert(
-                                        child_state_id.to_string(),
-                                        transition_states_label.to_owned(),
-                                    );
-
-                                    let accepting = transition_states
-                                        .iter()
-                                        .any(|&ts| nfa_table.accepting_states.contains(&ts));
-
-                                    if accepting {
-                                        builder.accepting_states.insert(transition_states_label);
-                                    }
-
-                                    break;
-                                }
-                            }
-                        }
-                    }
-                }
-
-                if builder.table.len() == 0 {
-                    builder.starting_state = label.to_owned();
-                }
-
-                builder.table.insert(label, row.to_owned());
+                row.insert(c.to_owned(), states);
+                new_states_bucket.push(ids);
             }
         }
 
-        builder
+        let start_state_label = nfa_row_starting_state_transitions
+            .iter()
+            .map(|&n| n.to_string())
+            .collect::<Vec<String>>()
+            .join(",");
+
+        dfa_table.starting_state = start_state_label.to_owned();
+        dfa_table.table.insert(start_state_label, row);
+        println!("nfa_accepting {:?}", nfa_table.accepting_states);
+        println!("new_states_bucket {:?}", new_states_bucket);
+
+        // Now that we found the starting state, we need to resolve any new states found during the states lookup.
+        while new_states_bucket.len() > 0 {
+            let new_states = new_states_bucket.pop().unwrap();
+            let mut row: BTreeMap<String, String> = BTreeMap::new();
+
+            let label = new_states
+                .iter()
+                .map(|&n| n.to_string())
+                .collect::<Vec<String>>()
+                .join(",");
+
+            let accepting = new_states
+                .iter()
+                .any(|&s| nfa_table.accepting_states.contains(&s));
+
+            println!("new_states {:?}", new_states);
+
+            if accepting {
+                dfa_table.accepting_states.insert(label.to_owned());
+                dfa_table.table.insert(label, row);
+                continue;
+            }
+
+            for c in alphabet.iter() {
+                if let Some(ids) = DFATable::find_epislon_closure(&c, &new_states, &nfa_table) {
+                    let states = ids
+                        .iter()
+                        .map(|&n| n.to_string())
+                        .collect::<Vec<String>>()
+                        .join(",");
+
+                    if !dfa_table.table.contains_key(&states) {
+                        new_states_bucket.push(ids);
+                    }
+
+                    row.insert(c.to_owned(), states);
+                }
+            }
+
+            dfa_table.table.insert(label, row);
+        }
+
+        println!("dfa_table {:#?}", dfa_table);
+        dfa_table
+    }
+
+    fn find_epislon_closure(
+        c: &String,
+        states: &Vec<usize>,
+        nfa_table: &NFATable,
+    ) -> Option<Vec<usize>> {
+        let epsilon_transitions_id = "ε*".to_string();
+        let mut states = states.clone();
+        let mut active = false;
+
+        println!("find_epislon_closure char={}", c);
+        while states.len() > 0 {
+            println!("  states={:?}", states);
+            let state_id = states.pop().unwrap();
+            println!("  state_id={}", state_id);
+
+            if let Some(row) = nfa_table.table.get(&state_id) {
+                println!("    row={:?}", row);
+
+                if let Some(ids) = row.get(c) {
+                    active = true;
+                    println!("      deep lookup ids={:?}", ids);
+                    states.extend(ids);
+                } else if active {
+                    if let Some(ids) = row.get(&epsilon_transitions_id) {
+                        println!("      found={:?}", ids);
+                        return Some(ids.to_vec());
+                    }
+                }
+            }
+        }
+
+        None
+    }
+
+    // DFA alphabet. Same as in NFA, except ε.
+    fn get_alphabet(&self, nfa_table: &NFATable) -> HashSet<String> {
+        nfa_table
+            .table
+            .values()
+            .map(|map| map.keys().cloned().collect::<Vec<String>>())
+            .flatten()
+            .filter(|c| *c != "ε*".to_string())
+            .collect()
     }
 }
 
@@ -335,9 +354,62 @@ mod tests {
     // }
 
     #[test]
-    fn get_transition_table_or() {
-        // Given regex /a|b/
-        // Its graph looks like:
+    fn get_transition_table_single_nfa() {
+        // Given regex /a/
+        // Its NFA graph looks like:
+        //                 ε          a
+        //  <start> (s:1) ---> (s:2) ---> <end>
+        //
+        // Its NFA table is:
+        //
+        // ┌─────┬───┬────┐
+        // │     │ a │ ε* │
+        // ├─────┼───┼────┤
+        // │ 1 > │ 2 │ 1  │
+        // ├─────┼───┼────┤
+        // │ 2 ✓ │   │ 2  │
+        // └─────┴───┴────┘
+        //
+        // Its DFA table is:
+        //
+        // ┌─────┬───┐
+        // │     │ a │
+        // ├─────┼───┤
+        // │ 1 > │ 2 │
+        // ├─────┼───┤
+        // │ 2 ✓ │   │
+        // └─────┴───┘
+        //
+        // And the data representation as JSON is:
+        //
+        // {
+        //   "1": { "a": "2" },
+        //   "2": {},
+        // }
+        let nfa = NFA::char('a');
+        let dfa_table = DFATable::from(&nfa);
+        // println!("test get_transition_table table {:#?}", dfa_table);
+
+        assert_eq!(dfa_table.starting_state, "1".to_string());
+        assert_eq!(dfa_table.accepting_states, HashSet::from(["2".to_string()]));
+        assert_eq!(dfa_table.table.len(), 2);
+
+        assert_eq!(
+            dfa_table.table.get(&"1".to_string()),
+            Some(&BTreeMap::from([("a".to_string(), "2".to_string()),]))
+        );
+
+        assert_eq!(
+            dfa_table.table.get(&"2".to_string()),
+            Some(&BTreeMap::new())
+        );
+    }
+
+    #[test]
+    fn get_transition_table_single_or() {
+        // Given regex /a|b/.
+        //
+        // Its NFA graph looks like:
         //                  ε          a          ε
         //                 ---> (s:2) ---> (s:3) ---
         //                /                          \
@@ -345,6 +417,24 @@ mod tests {
         //                \                          /
         //                 ---> (s:5) ---> (s:6) ---
         //                  ε          a          ε
+        //
+        // And the NFA table is:
+        //
+        // ┌─────┬───┬───┬─────────┐
+        // │     │ a │ b │ ε*      │
+        // ├─────┼───┼───┼─────────┤
+        // │ 1 > │   │   │ {1,2,5} │
+        // ├─────┼───┼───┼─────────┤
+        // │ 2   │ 3 │   │ 2       │
+        // ├─────┼───┼───┼─────────┤
+        // │ 3   │   │   │ {3,4}   │
+        // ├─────┼───┼───┼─────────┤
+        // │ 4 ✓ │   │   │ 4       │
+        // ├─────┼───┼───┼─────────┤
+        // │ 5   │   │ 6 │ 5       │
+        // ├─────┼───┼───┼─────────┤
+        // │ 6   │   │   │ {6,4}   │
+        // └─────┴───┴───┴─────────┘
         //
         // Its DFA table is:
         //
@@ -358,13 +448,6 @@ mod tests {
         // │ 6,4 ✓   │     │     │
         // └─────────┴─────┴─────┘
         //
-        // And the data representation as JSON is:
-        //
-        // {
-        //   "1,2,5": { "a": "3,4", "b": "6,4" },
-        //   "3,4": {},
-        //   "6,4": {},
-        // }
         let nfa = NFA::or(vec![NFA::char('a'), NFA::char('b')]);
         let mut dfa_table = DFATable::from(&nfa);
         // println!("test get_transition_table table {:#?}", dfa_table);
@@ -419,13 +502,6 @@ mod tests {
         // │ 3 ✓ │   │   │
         // └─────┴───┴───┘
         //
-        // And the data representation as JSON is:
-        //
-        // {
-        //   "1": { "a": "2", "b": "3" },
-        //   "2": {},
-        //   "3": {},
-        // }
         dfa_table.simplify_notations();
         // println!("test get_transition_table remapped table {:#?}", dfa_table);
 
@@ -454,6 +530,122 @@ mod tests {
 
         assert_eq!(
             dfa_table.table.get(&"3".to_string()),
+            Some(&BTreeMap::new())
+        );
+    }
+
+    #[test]
+    fn get_transition_table_or_and_concat() {
+        // Given regex /a|bc/.
+        //
+        //
+        // And the NFA table is:
+        //
+        // ┌─────┬───┬───┬───┬─────────┐
+        // │     │ a │ b │ c │ ε*      │
+        // ├─────┼───┼───┼───┼─────────┤
+        // │ 1 > │   │   │   │ {1,2,5} │
+        // ├─────┼───┼───┼───┼─────────┤
+        // │ 2   │ 3 │   │   │ 2       │
+        // ├─────┼───┼───┼───┼─────────┤
+        // │ 3   │   │   │   │ {3,4}   │
+        // ├─────┼───┼───┼───┼─────────┤
+        // │ 4 ✓ │   │   │   │ 4       │
+        // ├─────┼───┼───┼───┼─────────┤
+        // │ 5   │   │ 6 │   │ 5       │
+        // ├─────┼───┼───┼───┼─────────┤
+        // │ 6   │   │   │   │ {6,7}   │
+        // ├─────┼───┼───┼───┼─────────┤
+        // │ 7   │   │   │ 8 │ 7       │
+        // ├─────┼───┼───┼───┼─────────┤
+        // │ 8   │   │   │   │ {8,4}   │
+        // └─────┴───┴───┴───┴─────────┘
+        //
+        // Its DFA table is:
+        //
+        //
+        // This is how the DFA table is built from the NFA table:
+        //
+        // 1,2,5 starting       | a: 2->3->3,4 | b: 5->6->6,7 | c:
+        // 6,7                  | a:           | b:           | c: 7->8->8,4
+        // 8,4   accepting (bc) | b:           | b:           | c:
+        // 3,4   accepting (a)  | a:           | b:           | c:
+        //
+        let nfa = NFA::or(vec![
+            NFA::char('a'),
+            NFA::concat(vec![NFA::char('b'), NFA::char('c')]),
+        ]);
+        let mut dfa_table = DFATable::from(&nfa);
+        // println!("test get_transition_table table {:#?}", dfa_table);
+
+        assert_eq!(dfa_table.starting_state, "1,2,5".to_string());
+
+        assert_eq!(dfa_table.accepting_states.len(), 2);
+        assert_eq!(
+            dfa_table.accepting_states,
+            HashSet::from(["3,4".to_string(), "8,4".to_string()])
+        );
+
+        assert_eq!(dfa_table.table.len(), 4);
+
+        assert_eq!(
+            dfa_table.table.get(&"1,2,5".to_string()),
+            Some(&BTreeMap::from([
+                ("b".to_string(), "6,7".to_string()),
+                ("a".to_string(), "3,4".to_string()),
+            ]))
+        );
+
+        assert_eq!(
+            dfa_table.table.get(&"3,4".to_string()),
+            Some(&BTreeMap::new())
+        );
+
+        assert_eq!(
+            dfa_table.table.get(&"6,7".to_string()),
+            Some(&BTreeMap::from([("c".to_string(), "8,4".to_string())]))
+        );
+
+        assert_eq!(
+            dfa_table.table.get(&"8,4".to_string()),
+            Some(&BTreeMap::new())
+        );
+
+        // In this second testing phase we apply the remapping to simplify the state notations.
+        //
+        dfa_table.simplify_notations();
+        println!("test get_transition_table remapped table {:#?}", dfa_table);
+
+        assert_eq!(dfa_table.starting_state, "1".to_string());
+
+        assert_eq!(dfa_table.accepting_states.len(), 2);
+        assert_eq!(
+            dfa_table.accepting_states,
+            HashSet::from(["2".to_string(), "4".to_string()])
+        );
+
+        assert_eq!(dfa_table.table.len(), 4);
+
+        assert_eq!(
+            dfa_table.table.get(&"1".to_string()),
+            Some(&BTreeMap::from([
+                ("b".to_string(), "3".to_string()),
+                ("a".to_string(), "2".to_string()),
+            ]))
+        );
+
+        assert_eq!(
+            dfa_table.table.get(&"2".to_string()),
+            Some(&BTreeMap::new())
+        );
+
+        assert_eq!(
+            dfa_table.table.get(&"3".to_string()),
+            Some(&BTreeMap::from([("c".to_string(), "4".to_string()),]))
+        );
+
+        assert_eq!(
+            dfa_table.table.get(&"4".to_string()),
             Some(&BTreeMap::new())
         );
     }

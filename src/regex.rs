@@ -1,22 +1,26 @@
 use crate::{
     ast::{parser::Parser, AST},
-    automata::nfa::NFA,
+    automata::{dfa::DFA, nfa::NFA},
     error::Error,
 };
 
-pub struct Regex {}
+pub struct Regex {
+    dfa: DFA,
+}
 
 impl Regex {
     pub fn new(input: &str) -> Result<Regex, Error> {
         let ast = Parser::new()
             .parse(input)
             .map_err(Error::from_ast_parse_error)?;
-        dbg!(ast);
-        Ok(Regex {})
+        let nfa = ast_to_nfa(&ast);
+        let dfa = nfa_to_dfa(&nfa);
+        // dfa.minimize();
+        Ok(Regex { dfa })
     }
 
-    pub fn test(&self) -> bool {
-        todo!()
+    pub fn test(&self, text: &str) -> bool {
+        self.dfa.test(text)
     }
 }
 
@@ -31,6 +35,11 @@ fn ast_to_nfa(ast: &AST) -> NFA {
         AST::Alternation(alt) => NFA::or(alt.asts.iter().map(|a| ast_to_nfa(&a)).collect()),
         AST::Empty(_) => NFA::empty(),
     }
+}
+
+/// Translates NFA to DFA.
+fn nfa_to_dfa(nfa: &NFA) -> DFA {
+    DFA::from(nfa)
 }
 
 #[cfg(test)]
@@ -93,4 +102,20 @@ mod tests {
             ],)
         );
     }
+    //
+    // #[test]
+    // fn test_empty() {
+    //     assert_eq!(Regex::new("").unwrap().test(""), true);
+    // }
+
+    #[test]
+    fn test_single_char() {
+        assert_eq!(Regex::new("a").unwrap().test("a"), true);
+    }
+
+    #[test]
+    fn test_multiple_chars() {}
+
+    #[test]
+    fn test_multiple_chars_with_alternation() {}
 }

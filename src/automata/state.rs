@@ -7,7 +7,7 @@ use std::{
 pub static EPSILON: char = 'ε';
 pub static EPSILON_TRANSITIONS: &str = "ε*";
 
-// TODO: consider removing Rc+RefCell trates
+// TODO: consider removing Rc trait
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct State {
     pub accepting: bool,
