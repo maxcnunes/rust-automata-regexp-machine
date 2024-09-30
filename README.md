@@ -1,6 +1,12 @@
 # rust-automata-regexp-machine
 
-This is the output of my journey learning the Automata theory (NFA and DFA) to understand how a Regex machine works internally.
+TLTR: This is an incomplete and broken regex engine implementation.
+
+I got interested how Regex works internally. The [Automata Theory: inside a RegExp machine course
+](https://www.udemy.com/course/automata-theory-building-a-regexp-machine) by Dmitry Soshnikov, was a great
+resource to understand it.
+
+I decided to implement it, but it was taking way longer than I expected, getting confused in some implementation details, so I eventually aborted it.
 
 For the Regex pattern parser to an Abstract Syntax Tree (AST), I basically copied Rust's own regex AST implementation: https://github.com/rust-lang/regex.
 I recommend checking out the original source code, I found it an elegant implementation and very well documented. It was a great resource

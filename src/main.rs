@@ -3,74 +3,90 @@ mod automata;
 mod error;
 mod regex;
 
-use automata::{dfa::DFA, nfa::NFA, nfa_table::NFATable, state};
+use automata::{dfa::DFA, nfa_table::NFATable, state};
 use std::{cmp::Ordering, collections::HashSet};
 
-use clap::Parser;
+use clap::{Parser, Subcommand};
 use term_table::{row::Row, table_cell::*, Table, TableStyle};
 
 use crate::regex::Regex;
 
 /// Automata RegExp machine
 #[derive(Parser, Debug)]
-#[command(version, about, long_about = None)]
+#[clap(version)]
 struct Args {
     /// RegExp
     #[arg(short, long)]
     regexp: String,
 
-    /// Table
-    #[arg(short, long)]
-    table: String,
+    #[command(subcommand)]
+    cmd: Commands,
+}
 
-    /// Simplify notations
-    #[arg(short, long)]
-    simplify_notations: bool,
+#[derive(Subcommand, Debug)]
+enum Commands {
+    /// Test a regex
+    ///
+    /// This command will open your $EDITOR, wait for you
+    /// to write something, and then save the file to your
+    /// garden
+    Test {
+        /// Input to test
+        #[clap(short, long)]
+        input: String,
+    },
+
+    Table {
+        /// Simplify notations
+        #[arg(short, long)]
+        simplify_notations: bool,
+    },
 }
 
 fn main() {
     println!("Regex automata course!");
     let args = Args::parse();
 
-    let nfa = NFA::or(vec![NFA::char('a'), NFA::char('b')]);
-    // println!(":::: final NFA={:#?}", re);
-    let nfa_table = nfa.get_transition_table();
-    // println!(":::: nfa table ={:#?}", nfa_table);
+    let r = Regex::new(&args.regexp).unwrap();
 
-    let mut dfa = DFA::from(&nfa);
-    // println!(":::: dfa table={:#?}", dfa_table);
-    if args.simplify_notations {
-        dfa.simplify_notations();
-    }
+    match args.cmd {
+        Commands::Test { input } => {
+            assert_eq!(r.test(&input), true);
+        }
+        Commands::Table { simplify_notations } => {
+            let nfa = r.nfa.clone();
+            let mut dfa = r.dfa.clone();
+            // println!(":::: final NFA={:#?}", re);
+            let nfa_table = nfa.get_transition_table();
+            // println!(":::: nfa table ={:#?}", nfa_table);
 
-    println!("");
-    println!("> - starting");
-    println!("✓ - accepting");
-    println!("");
+            // println!(":::: dfa table={:#?}", dfa_table);
+            if simplify_notations {
+                dfa.simplify_notations();
+            }
 
-    println!("NFA: Transition table:");
-    println!("");
-    print_nfa_table(&nfa_table);
+            println!("");
+            println!("> - starting");
+            println!("✓ - accepting");
+            println!("");
 
-    println!("DFA: Original transition table:");
-    println!("");
-    print_dfa_table(&dfa);
+            println!("NFA: Transition table:");
+            println!("");
+            print_nfa_table(&nfa_table);
 
-    dfa.minimize();
-    if args.simplify_notations {
-        dfa.simplify_notations();
-    }
-    println!("DFA: Minimized transition table");
-    println!("");
-    print_dfa_table(&dfa);
+            println!("DFA: Original transition table:");
+            println!("");
+            print_dfa_table(&dfa);
 
-    // let input = "a|b";
-    // let tokens = ast::lexer::tokens(input);
-    // println!("Tokens: {:#?}", tokens);
-
-    let input = "a";
-    let r = Regex::new(input).unwrap();
-    r.test("a");
+            dfa.minimize();
+            if simplify_notations {
+                dfa.simplify_notations();
+            }
+            println!("DFA: Minimized transition table");
+            println!("");
+            print_dfa_table(&dfa);
+        }
+    };
 }
 
 fn print_nfa_table(nfa_table: &NFATable) {

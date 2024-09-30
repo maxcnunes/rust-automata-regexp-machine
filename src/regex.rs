@@ -5,7 +5,8 @@ use crate::{
 };
 
 pub struct Regex {
-    dfa: DFA,
+    pub nfa: NFA,
+    pub dfa: DFA,
 }
 
 impl Regex {
@@ -16,7 +17,7 @@ impl Regex {
         let nfa = ast_to_nfa(&ast);
         let dfa = nfa_to_dfa(&nfa);
         // dfa.minimize();
-        Ok(Regex { dfa })
+        Ok(Regex { nfa, dfa })
     }
 
     pub fn test(&self, text: &str) -> bool {

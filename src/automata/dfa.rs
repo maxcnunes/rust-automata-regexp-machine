@@ -93,14 +93,14 @@ impl DFA {
         let mut new_base_group = vec![state_a.to_owned()];
 
         while let Some(state_b) = base_group_iter.next() {
-            // println!("-----------------");
-            // println!("state_a {:?}", state_a);
-            // println!("state_b {:?}", state_b);
+            println!("-----------------");
+            println!("state_a {:?}", state_a);
+            println!("state_b {:?}", state_b);
 
             let state_a_transitions = self.table.table.get(&state_a).unwrap();
             let state_b_transitions = self.table.table.get(&state_b).unwrap();
-            // println!("state_a_transitions {:#?}", state_a_transitions);
-            // println!("state_b_transitions {:#?}", state_b_transitions);
+            println!("state_a_transitions {:#?}", state_a_transitions);
+            println!("state_b_transitions {:#?}", state_b_transitions);
 
             let mut moved = false;
 
@@ -108,17 +108,6 @@ impl DFA {
                 let transition_state_b = state_b_transitions.get(transition).unwrap();
 
                 let group = &groups[0];
-                // println!("group {:#?}", group);
-                // println!(
-                //     "contains transition_state_a {:?} {:#?}",
-                //     transition_state_a,
-                //     group.contains(transition_state_a)
-                // );
-                // println!(
-                //     "contains transition_state_b {:?} {:#?}",
-                //     transition_state_b,
-                //     group.contains(transition_state_b)
-                // );
                 if transition_state_a != transition_state_b
                     && (!group.contains(transition_state_a) || !group.contains(transition_state_b))
                 {
